@@ -588,6 +588,7 @@ class Game {
     this.state = 'playing';
     this.time = 0;
     this.score = 0;
+    this.scoreSubmitted = false;
     this.kills = 0;
     this.level = 1;
     this.xp = 0;
@@ -1434,6 +1435,7 @@ class Game {
     this.dom.finalScore.textContent = String(this.score);
     try { this.dom.playerName.value = leaderboardStorage()?.getItem('civilization-fire-player-name') || ''; } catch { this.dom.playerName.value = ''; }
     this.dom.scoreStatus.textContent = '输入名字后保存本轮成绩';
+    this.dom.scoreForm.querySelector('button').disabled = false;
     this.renderLeaderboard();
     this.dom.end.hidden = false;
   }
@@ -1458,11 +1460,14 @@ class Game {
   }
 
   submitScore(name) {
+    if (this.scoreSubmitted) return;
     const playerName = normalizePlayerName(name);
     saveLeaderboardEntry(playerName, this.score, this.difficulty.short, this.time);
     try { leaderboardStorage()?.setItem('civilization-fire-player-name', playerName); } catch { /* private mode: score still appears this session */ }
     this.dom.playerName.value = playerName;
     this.dom.scoreStatus.textContent = '本轮成绩已加入榜单';
+    this.scoreSubmitted = true;
+    this.dom.scoreForm.querySelector('button').disabled = true;
     this.renderLeaderboard();
   }
 
