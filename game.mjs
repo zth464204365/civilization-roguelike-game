@@ -1,5 +1,7 @@
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const JOYSTICK_MAX = 32;
+const VAMPIRE_HEAL_PER_HIT = 2;
+const VAMPIRE_RUNE_CHANCE = .08;
 function joystickVector(offsetX, offsetY, max = JOYSTICK_MAX) {
   const distance = Math.hypot(offsetX, offsetY);
   if (!distance || max <= 0) return { x: 0, y: 0 };
@@ -65,8 +67,19 @@ function applyPickup(player, kind) {
     player.invuln = Math.max(player.invuln, 3);
     return { text: '祖灵护符 · 无敌 3 秒', color: '#aabdf5' };
   }
+  if (kind === 'vampire') {
+    player.vampireLevel = (player.vampireLevel || 0) + 1;
+    return { text: `吸血符文 · 命中回复 ${player.vampireLevel * VAMPIRE_HEAL_PER_HIT}`, color: '#e78aa8' };
+  }
   player.pierce += 1;
   return { text: '兽骨 · 穿透 +1', color: '#d9e3be' };
+}
+
+function applyVampireHeal(player, stacks) {
+  const amount = Math.max(0, Math.floor(stacks || 0)) * VAMPIRE_HEAL_PER_HIT;
+  const before = player.hp;
+  player.hp = Math.min(player.maxHp, player.hp + amount);
+  return player.hp - before;
 }
 
 function chooseUnique(items, count, random = Math.random) {
@@ -295,6 +308,7 @@ const PICKUPS = {
   relic: { color: '#72d4d0', glow: '#b7fff7' },
   haste: { color: '#a8de66', glow: '#ddffad' },
   ward: { color: '#95a8ed', glow: '#d1dcff' },
+  vampire: { color: '#d96f97', glow: '#ffb1c8' },
 };
 
 const ACTIVE_SKILLS = {
@@ -616,6 +630,7 @@ class Game {
       fireEvery: .43, fireTimer: .15, damage: 18, projectiles: 1, pierce: 0, magnet: 86,
       spikeEvery: 2.18, spikeTimer: .8, spikeCount: 3, spikeDamage: 16,
       growthStage: 0, orbitCount: 1, orbitDamage: 14, orbitEvery: .36, orbitTimer: .16,
+      vampireLevel: 0,
       chainLevel: 0, chainEvery: 2.45, chainTimer: .4, chainDamage: 25,
       wheelLevel: 0, wheelEvery: 2.8, wheelTimer: .6, wheelDamage: 24,
       invuln: 0, hitInvuln: this.difficulty.hitInvuln, nova: 0, novaMax: 9, flash: 0, hitPulse: 0, slow: 0, haste: 0,
@@ -1067,6 +1082,8 @@ class Game {
   damageEnemy(enemy, amount) {
     const damage = enemy.shield > 0 ? Math.max(1, Math.round(amount * .52)) : amount;
     enemy.hp -= damage;
+    const vampireHealed = applyVampireHeal(this.player, this.player.vampireLevel);
+    if (vampireHealed > 0) this.particles.push({ x: this.player.x, y: this.player.y - 22, vx: 0, vy: -18, life: .22, max: .22, color: '#f09ab3', size: 2.5 });
     enemy.hit = .15;
     this.particles.push(...Array.from({ length: enemy.boss ? 6 : 3 }, () => ({ x: enemy.x, y: enemy.y, vx: (Math.random() - .5) * 150, vy: (Math.random() - .5) * 150, life: .28, max: .28, color: enemy.shield > 0 ? '#d8eaa2' : enemy.color, size: 2 + Math.random() * 2 })));
     if (enemy.hp <= 0 && !enemy.dead) this.killEnemy(enemy);
@@ -1160,9 +1177,10 @@ class Game {
     for (let i = 0; i < drops; i += 1) this.gems.push({ x: enemy.x + (Math.random() - .5) * 12, y: enemy.y + (Math.random() - .5) * 12, r: 5, value: XP_PER_GEM, t: Math.random() * 3 });
     if (this.kills % this.difficulty.pickupEvery === 0) {
       const kinds = Object.keys(PICKUPS);
-      const kind = kinds[pickupIndex(this.kills, this.difficulty.pickupEvery, kinds.length)];
+      const kind = kinds.filter(kindName => kindName !== 'vampire')[pickupIndex(this.kills, this.difficulty.pickupEvery, kinds.length - 1)];
       this.pickups.push({ kind, x: enemy.x, y: enemy.y, r: 10, t: 0 });
     }
+    if (Math.random() < VAMPIRE_RUNE_CHANCE) this.pickups.push({ kind: 'vampire', x: enemy.x + (Math.random() - .5) * 18, y: enemy.y + (Math.random() - .5) * 18, r: 11, t: 0 });
   }
 
   fireEnemyShots(enemy, dx, dy) {
@@ -1731,6 +1749,10 @@ class Game {
         ctx.beginPath(); ctx.moveTo(0, -item.r); ctx.lineTo(item.r * .76, item.r * .75); ctx.lineTo(-item.r * .76, item.r * .75); ctx.closePath(); ctx.fill();
       } else if (item.kind === 'ward') {
         ctx.beginPath(); ctx.moveTo(0, -item.r); ctx.lineTo(item.r * .78, -item.r * .45); ctx.lineTo(item.r * .58, item.r * .7); ctx.lineTo(0, item.r); ctx.lineTo(-item.r * .58, item.r * .7); ctx.lineTo(-item.r * .78, -item.r * .45); ctx.closePath(); ctx.fill();
+      } else if (item.kind === 'vampire') {
+        ctx.rotate(Math.sin(item.t) * .12);
+        ctx.beginPath(); ctx.moveTo(0, item.r * .82); ctx.lineTo(-item.r * .78, -item.r * .1); ctx.arc(-item.r * .38, -item.r * .18, item.r * .4, Math.PI, 0); ctx.arc(item.r * .38, -item.r * .18, item.r * .4, Math.PI, 0); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ffe1eb'; ctx.beginPath(); ctx.arc(0, item.r * .1, item.r * .18, 0, TAU); ctx.fill();
       } else {
         ctx.rotate(Math.sin(item.t) * .14);
         ctx.fillRect(-item.r * .7, -3, item.r * 1.4, 6);
@@ -2073,6 +2095,7 @@ class Game {
       p.haste > 0 && `疾行 ${Math.ceil(p.haste)}s`,
       p.invuln > 1 && `护符 ${Math.ceil(p.invuln)}s`,
       p.ward > 0 && `护壁 ${Math.ceil(p.ward)}s`,
+      p.vampireLevel > 0 && `吸血 ×${p.vampireLevel}`,
     ].filter(Boolean).join(' · ');
     ctx.save();
     ctx.fillStyle = 'rgba(9, 24, 20, .64)';
@@ -2218,7 +2241,7 @@ function boot() {
 }
 
 if (typeof document === 'undefined') {
-globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss };
+globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss };
 } else {
   boot();
 }
