@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#09242f" />
+    <title>文明火种 · 蛮荒生存肉鸽</title>
+    <style>
+      :root { color-scheme: dark; font-family: "Microsoft YaHei", system-ui, sans-serif; }
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      body {
+        margin: 0; min-height: 100dvh; overflow: hidden; background: #03110d;
+        display: grid; place-items: center; color: #f5f7ff;
+      }
+      #game-wrap {
+        position: relative; width: min(100vw, 540px); height: 100dvh; overflow: hidden;
+        background: #09242f; box-shadow: 0 0 60px rgba(93, 177, 132, .2);
+      }
+      canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+      .overlay {
+        position: absolute; inset: 0; z-index: 4; display: grid; place-items: center;
+        padding: 24px; background: rgba(3, 5, 16, .62); backdrop-filter: blur(8px);
+      }
+      .overlay[hidden] { display: none; }
+      .panel {
+        width: min(100%, 370px); padding: 26px 22px; border: 1px solid rgba(173, 211, 147, .42);
+        border-radius: 24px; background: linear-gradient(145deg, rgba(24, 59, 43, .96), rgba(7, 22, 16, .96));
+        box-shadow: 0 18px 60px rgba(0, 0, 0, .42); text-align: center;
+      }
+      .eyebrow { margin: 0 0 10px; color: #b4de8d; font-size: 12px; letter-spacing: .16em; }
+      h1, h2 { margin: 0; line-height: 1.1; }
+      h1 { font-size: clamp(31px, 9vw, 42px); letter-spacing: .06em; }
+      h2 { font-size: 25px; }
+      .intro { margin: 16px 0 22px; color: #c5cce5; font-size: 14px; line-height: 1.8; }
+      .tips { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 16px 0 22px; text-align: left; }
+      .tip { padding: 10px; border-radius: 12px; background: rgba(140, 187, 107, .12); color: #d8ead0; font-size: 12px; line-height: 1.45; }
+      button {
+        border: 0; border-radius: 14px; color: #fff; background: linear-gradient(135deg, #749d48, #3d9178);
+        padding: 14px 18px; min-height: 49px; font: inherit; font-weight: 800; cursor: pointer;
+        box-shadow: 0 8px 22px rgba(72, 105, 255, .35); touch-action: manipulation;
+      }
+      button:active { transform: translateY(1px) scale(.985); }
+      #choice-list { display: grid; gap: 10px; margin-top: 18px; text-align: left; }
+      .choice {
+        width: 100%; padding: 13px 14px; min-height: 0; text-align: left; color: #eef1ff;
+        background: rgba(115, 139, 246, .16); border: 1px solid rgba(159, 178, 255, .27); box-shadow: none;
+      }
+      .choice strong { display: block; margin-bottom: 3px; font-size: 15px; }
+      .choice span { display: block; color: #bfc8e8; font-size: 12px; font-weight: 500; line-height: 1.35; }
+      #difficulty-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0 18px; }
+      .difficulty-choice {
+        min-height: 94px; padding: 10px 6px; border: 1px solid rgba(180, 222, 152, .36); border-radius: 13px;
+        background: rgba(140, 187, 107, .12); box-shadow: none; text-align: left; font-size: 12px; line-height: 1.35;
+      }
+      .difficulty-choice strong { display: block; margin-bottom: 5px; color: #eef3d7; font-size: 15px; }
+      .difficulty-choice span { display: block; color: #c5d5bd; font-weight: 500; }
+      .difficulty-choice[data-difficulty="gentle"] { border-color: rgba(164, 222, 153, .68); }
+      .difficulty-choice[data-difficulty="normal"] { border-color: rgba(232, 211, 121, .68); }
+      .difficulty-choice[data-difficulty="harsh"] { border-color: rgba(239, 130, 104, .7); }
+      .difficulty-choice:active { background: rgba(194, 223, 122, .24); }
+      #nova {
+        position: absolute; z-index: 3; right: 18px; bottom: max(22px, env(safe-area-inset-bottom));
+        width: 72px; height: 72px; padding: 0; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .38);
+        background: radial-gradient(circle at 34% 28%, #f4edb0, #b3d36d 36%, #3a8565 73%);
+        box-shadow: 0 0 0 5px rgba(179, 211, 109, .14), 0 10px 28px rgba(32, 91, 66, .45);
+        font-size: 12px; line-height: 1.15;
+      }
+      #nova[hidden] { display: none; }
+      #nova[data-ready="false"] { filter: saturate(.25) brightness(.65); }
+      #nova small { display: block; margin-top: 2px; font-size: 10px; font-weight: 700; }
+      .active-skill {
+        position: absolute; z-index: 3; left: 18px; width: 66px; height: 66px; padding: 0;
+        border-radius: 50%; border: 2px solid rgba(255, 255, 255, .32);
+        background: radial-gradient(circle at 34% 28%, #d8f0e3, #5da98e 42%, #265c68 76%);
+        box-shadow: 0 0 0 4px rgba(106, 210, 172, .12), 0 8px 22px rgba(20, 70, 81, .42);
+        font-size: 11px; line-height: 1.1;
+      }
+      .active-skill[hidden] { display: none; }
+      .active-skill[data-ready="false"] { filter: saturate(.2) brightness(.65); }
+      .active-skill small { display: block; margin-top: 2px; font-size: 9px; font-weight: 700; }
+      #dash { bottom: max(22px, env(safe-area-inset-bottom)); }
+      #spear { bottom: max(96px, calc(env(safe-area-inset-bottom) + 74px)); }
+      #ward { left: 92px; bottom: max(22px, env(safe-area-inset-bottom)); }
+      @media (min-width: 541px) {
+        #game-wrap { height: min(100dvh, 900px); border-radius: 20px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="game-wrap" aria-label="文明火种游戏">
+      <canvas id="game" aria-label="游戏画面"></canvas>
+      <button id="nova" hidden aria-label="释放演化脉冲">脉冲<small>就绪</small></button>
+      <button id="dash" class="active-skill" hidden aria-label="疾驰，快捷键 Q">疾驰<small>Q · 就绪</small></button>
+      <button id="spear" class="active-skill" hidden aria-label="飓风，快捷键 E">飓风<small>E · 就绪</small></button>
+      <button id="ward" class="active-skill" hidden aria-label="祖灵护壁，快捷键 R">护壁<small>R · 就绪</small></button>
+
+      <section class="overlay" id="start-screen">
+        <div class="panel">
+          <p class="eyebrow">PRIMAL SURVIVAL ROGUELITE</p>
+          <h1>文明火种</h1>
+          <p class="intro">选择迁徙难度后立即开始。攻击会从萌芽进化为猎手与火种，击败赤焰巨猿，守住文明火种。</p>
+          <div id="difficulty-list" aria-label="选择游戏难度">
+            <button class="difficulty-choice" data-difficulty="gentle"><strong>游猎</strong><span>敌人较弱<br>出现较慢</span></button>
+            <button class="difficulty-choice" data-difficulty="normal"><strong>迁徙</strong><span>推荐节奏<br>平衡挑战</span></button>
+            <button class="difficulty-choice" data-difficulty="harsh"><strong>试炼</strong><span>敌人更强<br>出现更快</span></button>
+          </div>
+          <div class="tips">
+            <div class="tip">手机：按住并拖动，左下技能键可疾驰、飓风、护壁</div>
+            <div class="tip">电脑：WASD / 方向键移动，Q 疾驰，E 飓风，R 护壁，空格脉冲</div>
+            <div class="tip">遗迹：击破彩色遗迹，可强化对应的 Q / E / R 主动技能</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="overlay" id="upgrade-screen" hidden>
+        <div class="panel">
+          <p class="eyebrow">LEVEL UP</p>
+          <h2>选择一项强化</h2>
+          <div id="choice-list"></div>
+        </div>
+      </section>
+
+      <section class="overlay" id="end-screen" hidden>
+        <div class="panel">
+          <p class="eyebrow" id="end-kicker">RUN OVER</p>
+          <h2 id="end-title">演化中止</h2>
+          <p class="intro" id="end-summary"></p>
+          <button id="restart-button">返回难度选择</button>
+        </div>
+      </section>
+    </main>
+    <script src="./game.mjs?v=20260828-5"></script>
+  </body>
+</html>
