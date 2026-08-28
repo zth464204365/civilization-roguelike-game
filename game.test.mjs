@@ -6,9 +6,15 @@ const sandbox = {};
 vm.createContext(sandbox);
 const gameSource = readFileSync(new URL('./game.mjs', import.meta.url), 'utf8');
 vm.runInContext(gameSource, sandbox);
-const { chooseUnique, clamp, enemyStats, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss } = sandbox.__civilizationTest;
+const { chooseUnique, clamp, joystickVector, enemyStats, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss } = sandbox.__civilizationTest;
 
 assert.equal(clamp(12, 0, 10), 10);
+assert.equal(joystickVector(0, 0).x, 0);
+assert.equal(joystickVector(0, 0).y, 0);
+assert.equal(joystickVector(100, 0).x, 1);
+assert.equal(joystickVector(100, 0).y, 0);
+const diagonalJoystick = joystickVector(100, 100);
+assert.ok(Math.abs(Math.hypot(diagonalJoystick.x, diagonalJoystick.y) - 1) < 0.000001);
 assert.deepEqual(Array.from(chooseUnique(['a', 'b', 'c'], 3, () => 0)), ['a', 'b', 'c']);
 assert.equal(new Set(chooseUnique(['a', 'b', 'c'], 3)).size, 3);
 assert.equal(enemyStats('reversionBoss', 1.2).hp, 984);
@@ -144,7 +150,7 @@ applyPickup(bonusPickupPlayer, 'haste');
 applyPickup(bonusPickupPlayer, 'ward');
 assert.deepEqual(bonusPickupPlayer, { hp: 100, maxHp: 100, nova: 0, pierce: 0, haste: 8, invuln: 3 });
 assert.equal(musicFrequency(0), 110);
-assert.ok(MUSIC_GAIN >= .4);
+assert.ok(MUSIC_GAIN >= .84);
 assert.ok(MUSIC_STAGES[0].energy < MUSIC_STAGES[5].energy);
 const fakeAudioContext = {
   sampleRate: 100,

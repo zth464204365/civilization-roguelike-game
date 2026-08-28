@@ -68,6 +68,24 @@
       #nova[hidden] { display: none; }
       #nova[data-ready="false"] { filter: saturate(.25) brightness(.65); }
       #nova small { display: block; margin-top: 2px; font-size: 10px; font-weight: 700; }
+      #joystick {
+        position: absolute; z-index: 3; right: 104px; bottom: max(104px, calc(env(safe-area-inset-bottom) + 82px));
+        width: 112px; height: 112px; display: grid; place-items: center; padding: 0;
+        border: 2px solid rgba(202, 239, 215, .4); border-radius: 50%;
+        background: radial-gradient(circle, rgba(131, 199, 157, .3), rgba(30, 82, 74, .58) 68%, rgba(6, 27, 26, .82));
+        box-shadow: 0 0 0 5px rgba(105, 194, 154, .1), 0 10px 28px rgba(10, 49, 43, .46);
+        touch-action: none; user-select: none;
+      }
+      #joystick[hidden] { display: none; }
+      #joystick::after {
+        content: ""; position: absolute; inset: 15px; border: 1px dashed rgba(206, 242, 213, .24); border-radius: 50%; pointer-events: none;
+      }
+      #joystick-knob {
+        width: 48px; height: 48px; border-radius: 50%; pointer-events: none;
+        background: radial-gradient(circle at 34% 28%, #e8f8da, #8bc99a 44%, #39796d 78%);
+        border: 2px solid rgba(255, 255, 255, .4); box-shadow: 0 5px 15px rgba(9, 37, 31, .45);
+        transform: translate(0, 0); transition: transform .05s linear;
+      }
       .active-skill {
         position: absolute; z-index: 3; left: 18px; width: 66px; height: 66px; padding: 0;
         border-radius: 50%; border: 2px solid rgba(255, 255, 255, .32);
@@ -83,6 +101,7 @@
       #ward { left: 92px; bottom: max(22px, env(safe-area-inset-bottom)); }
       @media (min-width: 541px) {
         #game-wrap { height: min(100dvh, 900px); border-radius: 20px; }
+        #joystick { display: none !important; }
       }
     </style>
   </head>
@@ -93,6 +112,7 @@
       <button id="dash" class="active-skill" hidden aria-label="疾驰，快捷键 Q">疾驰<small>Q · 就绪</small></button>
       <button id="spear" class="active-skill" hidden aria-label="飓风，快捷键 E">飓风<small>E · 就绪</small></button>
       <button id="ward" class="active-skill" hidden aria-label="祖灵护壁，快捷键 R">护壁<small>R · 就绪</small></button>
+      <div id="joystick" hidden aria-label="移动方向圆盘" role="application"><span id="joystick-knob"></span></div>
 
       <section class="overlay" id="start-screen">
         <div class="panel">
@@ -105,7 +125,7 @@
             <button class="difficulty-choice" data-difficulty="harsh"><strong>试炼</strong><span>敌人更强<br>出现更快</span></button>
           </div>
           <div class="tips">
-            <div class="tip">手机：按住并拖动，左下技能键可疾驰、飓风、护壁</div>
+            <div class="tip">手机：左侧拖动或右下方向圆盘移动；可用另一根手指同时释放技能</div>
             <div class="tip">电脑：WASD / 方向键移动，Q 疾驰，E 飓风，R 护壁，空格脉冲</div>
             <div class="tip">遗迹：击破彩色遗迹，可强化对应的 Q / E / R 主动技能</div>
           </div>
@@ -129,6 +149,6 @@
         </div>
       </section>
     </main>
-    <script src="./game.mjs?v=20260828-5"></script>
+    <script src="./game.mjs?v=20260828-6"></script>
   </body>
 </html>

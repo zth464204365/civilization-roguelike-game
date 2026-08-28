@@ -1,4 +1,11 @@
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+const JOYSTICK_MAX = 32;
+function joystickVector(offsetX, offsetY, max = JOYSTICK_MAX) {
+  const distance = Math.hypot(offsetX, offsetY);
+  if (!distance || max <= 0) return { x: 0, y: 0 };
+  const scale = Math.min(1, max / distance) / max;
+  return { x: offsetX * scale, y: offsetY * scale };
+}
 const tileNoise = (x, y) => {
   const value = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
   return value - Math.floor(value);
@@ -316,7 +323,7 @@ function activeSkillCooldown(player, id) {
 }
 
 const MUSIC_LOOP_SECONDS = 8;
-const MUSIC_GAIN = .42;
+const MUSIC_GAIN = .84;
 const MUSIC_STAGES = [
   { energy: .10, bass: [-12, -8, -5, -10], melody: [7, 10, 12, 10, 7, 5, 3, 5, 10, 12, 15, 12, 10, 7, 5, 3] },
   { energy: .26, bass: [-10, -7, -3, -8], melody: [5, 8, 10, 12, 10, 8, 5, 3, 8, 10, 13, 12, 10, 8, 5, 1] },
@@ -391,12 +398,13 @@ function createMusicLoop(context, stage = 0) {
     for (let beat = 0; beat < 4; beat += 1) {
       const beatStart = start + beat * .5;
       addTone(beatStart, .3, profile.bass[bar] + (beat === 2 ? 7 : 12), .035 + energy * .027, .2 + energy * .28);
-      if (energy > .32) addTone(beatStart + .18, .08, profile.bass[bar] - 12, .012 + energy * .026, .7);
-      if (energy > .68) addTone(beatStart + .36, .055, profile.bass[bar] + 19, .010 + energy * .018, .54);
+      if (energy > .32) addTone(beatStart + .18, .08, profile.bass[bar] - 12, .018 + energy * .035, .72);
+      if (energy > .5) addTone(beatStart + .25, .06, profile.bass[bar] - 19, .012 + energy * .022, .86);
+      if (energy > .68) addTone(beatStart + .36, .055, profile.bass[bar] + 19, .016 + energy * .028, .58);
     }
   }
-  profile.melody.forEach((note, index) => addTone(index * .5 + .04, .32, note, .040 + energy * .025, .22 + energy * .30));
-  for (let index = 0; index < samples.length; index += 1) samples[index] = Math.tanh(samples[index] * (1.2 + energy * .3)) * .6;
+  profile.melody.forEach((note, index) => addTone(index * .5 + .04, .32, note, .045 + energy * .030, .25 + energy * .38));
+  for (let index = 0; index < samples.length; index += 1) samples[index] = Math.tanh(samples[index] * (1.35 + energy * .42)) * .6;
   return buffer;
 }
 
@@ -410,6 +418,7 @@ class Game {
     this.height = 640;
     this.keys = new Set();
     this.pointer = null;
+    this.joystick = null;
     this.lastFrame = 0;
     this.time = 0;
     this.state = 'menu';
@@ -577,6 +586,8 @@ class Game {
     this.dom.dash.hidden = false;
     this.dom.spear.hidden = false;
     this.dom.ward.hidden = false;
+    this.dom.joystick.hidden = false;
+    this.joystick = null;
     this.updateNovaButton();
     this.updateSkillButtons();
   }
@@ -594,10 +605,12 @@ class Game {
     this.state = 'menu';
     this.keys.clear();
     this.pointer = null;
+    this.joystick = null;
     this.dom.nova.hidden = true;
     this.dom.dash.hidden = true;
     this.dom.spear.hidden = true;
     this.dom.ward.hidden = true;
+    this.dom.joystick.hidden = true;
     this.dom.upgrade.hidden = true;
     this.dom.end.hidden = true;
     this.dom.start.hidden = false;
@@ -663,6 +676,32 @@ class Game {
     const release = event => { if (this.pointer?.id === event.pointerId) this.pointer = null; };
     this.canvas.addEventListener('pointerup', release);
     this.canvas.addEventListener('pointercancel', release);
+    const joystickOffset = event => {
+      const rect = this.dom.joystick.getBoundingClientRect();
+      return { x: event.clientX - (rect.left + rect.width / 2), y: event.clientY - (rect.top + rect.height / 2) };
+    };
+    const updateJoystick = event => {
+      const offset = joystickOffset(event);
+      const vector = joystickVector(offset.x, offset.y);
+      this.joystick = { id: event.pointerId, ...vector };
+      this.dom.joystickKnob.style.transform = `translate(${vector.x * JOYSTICK_MAX}px, ${vector.y * JOYSTICK_MAX}px)`;
+    };
+    const releaseJoystick = event => {
+      if (this.joystick?.id !== event.pointerId) return;
+      this.joystick = null;
+      this.dom.joystickKnob.style.transform = 'translate(0, 0)';
+    };
+    this.dom.joystick.addEventListener('pointerdown', event => {
+      if (this.state !== 'playing') return;
+      event.preventDefault();
+      this.dom.joystick.setPointerCapture(event.pointerId);
+      updateJoystick(event);
+    });
+    this.dom.joystick.addEventListener('pointermove', event => {
+      if (this.joystick?.id === event.pointerId) updateJoystick(event);
+    });
+    this.dom.joystick.addEventListener('pointerup', releaseJoystick);
+    this.dom.joystick.addEventListener('pointercancel', releaseJoystick);
     this.dom.nova.addEventListener('click', () => this.nova());
     this.dom.dash.addEventListener('click', () => this.dash());
     this.dom.spear.addEventListener('click', () => this.throwSpear());
@@ -788,14 +827,17 @@ class Game {
     }
     let dx = (this.keys.has('d') || this.keys.has('arrowright') ? 1 : 0) - (this.keys.has('a') || this.keys.has('arrowleft') ? 1 : 0);
     let dy = (this.keys.has('s') || this.keys.has('arrowdown') ? 1 : 0) - (this.keys.has('w') || this.keys.has('arrowup') ? 1 : 0);
-    if (this.pointer) {
+    if (this.joystick) {
+      dx = this.joystick.x;
+      dy = this.joystick.y;
+    } else if (this.pointer) {
       dx += this.pointer.x - this.width / 2;
       dy += this.pointer.y - this.height / 2;
     }
     const length = Math.hypot(dx, dy);
-    if (length > .5) {
+    if (length > (this.joystick ? .08 : .5)) {
       const speed = p.speed * (p.slow > 0 ? .65 : 1) * (p.haste > 0 ? 1.3 : 1);
-      const pace = Math.min(speed * dt, this.pointer ? length : speed * dt);
+      const pace = this.joystick ? speed * dt * Math.min(1, length) : Math.min(speed * dt, this.pointer ? length : speed * dt);
       this.moveAgainstTerrain(p, dx / length * pace, dy / length * pace, p.r);
       p.facing = directionFrame(dx, dy);
     }
@@ -1319,6 +1361,8 @@ class Game {
     this.dom.dash.hidden = true;
     this.dom.spear.hidden = true;
     this.dom.ward.hidden = true;
+    this.dom.joystick.hidden = true;
+    this.joystick = null;
     this.dom.endKicker.textContent = victory ? 'EVOLUTION COMPLETE' : 'EVOLUTION INTERRUPTED';
     this.dom.endTitle.textContent = victory ? '文明火种得以延续' : '火种熄灭';
     this.dom.endSummary.textContent = victory
@@ -2053,6 +2097,8 @@ function boot() {
     dash: document.querySelector('#dash'),
     spear: document.querySelector('#spear'),
     ward: document.querySelector('#ward'),
+    joystick: document.querySelector('#joystick'),
+    joystickKnob: document.querySelector('#joystick-knob'),
   };
   const game = new Game(document.querySelector('#game'), dom);
   dom.difficultyButtons.forEach(button => button.addEventListener('click', () => game.start(button.dataset.difficulty)));
@@ -2060,7 +2106,7 @@ function boot() {
 }
 
 if (typeof document === 'undefined') {
-globalThis.__civilizationTest = { clamp, chooseUnique, enemyStats, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss };
+globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss };
 } else {
   boot();
 }
