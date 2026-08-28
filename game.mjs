@@ -81,9 +81,9 @@ function chooseUnique(items, count, random = Math.random) {
 const TAU = Math.PI * 2;
 const BIOME_DURATION = 40;
 const DIFFICULTIES = {
-  gentle: { label: '游猎', short: '简', hp: .84, damage: .76, speed: .94, spawnRate: .84, hitInvuln: .65, pickupEvery: 4, description: '敌人较弱，出现较慢' },
-  normal: { label: '迁徙', short: '中', hp: 1.08, damage: 1.12, speed: 1.03, spawnRate: 1.12, hitInvuln: .5, pickupEvery: 5, description: '敌人更强，攻势更密集' },
-  harsh: { label: '试炼', short: '难', hp: 1.42, damage: 1.48, speed: 1.12, spawnRate: 1.38, hitInvuln: .42, pickupEvery: 6, description: '敌人凶猛，补给稀少' },
+  gentle: { label: '游猎', short: '简', hp: .84, damage: .76, speed: .94, spawnRate: .84, hitInvuln: .65, pickupEvery: 4, scoreMultiplier: .8, description: '敌人较弱，出现较慢' },
+  normal: { label: '迁徙', short: '中', hp: 1.08, damage: 1.12, speed: 1.03, spawnRate: 1.12, hitInvuln: .5, pickupEvery: 5, scoreMultiplier: 1, description: '敌人更强，攻势更密集' },
+  harsh: { label: '试炼', short: '难', hp: 1.42, damage: 1.48, speed: 1.12, spawnRate: 1.38, hitInvuln: .42, pickupEvery: 6, scoreMultiplier: 1.35, description: '敌人凶猛，补给稀少' },
 };
 
 function difficultyFor(id) {
@@ -148,20 +148,20 @@ function enemyVisualScale(enemy, art) {
 }
 
 const ENEMY_TYPES = {
-  amoeba: { hp: 24, speed: 56, radius: 12, xp: 1, damage: 8, color: '#76b7a3', form: 'blob', name: '潮池异螺', skill: 'spit', skillEvery: 2.9, skillRange: 265, shotKind: 'goo', shotSpeed: 150, shots: 2, shotSpread: .2 },
-  leech: { hp: 18, speed: 90, radius: 8, xp: 1, damage: 7, color: '#d5a764', form: 'spore', name: '砂砾虫', skill: 'dash', skillEvery: 3.1, skillRange: 235 },
-  crab: { hp: 58, speed: 43, radius: 17, xp: 3, damage: 13, color: '#4f8190', form: 'crab', name: '礁甲蟹', skill: 'pulse', skillEvery: 4.1, skillRange: 105, skillRadius: 90, skillPower: 1 },
-  savage: { hp: 46, speed: 72, radius: 15, xp: 2, damage: 11, color: '#b56b36', form: 'savage', name: '野人', skill: 'dash', skillEvery: 2.45, skillRange: 250 },
-  beetle: { hp: 52, speed: 48, radius: 15, xp: 3, damage: 12, color: '#78aa54', form: 'shell', name: '苔甲虫', skill: 'shell', skillEvery: 4.3, skillRange: Infinity },
-  moth: { hp: 23, speed: 106, radius: 10, xp: 2, damage: 8, color: '#c0cd72', form: 'wing', name: '叶翼飞虫', skill: 'fan', skillEvery: 3.1, skillRange: 290, shotKind: 'spore', shotSpeed: 175, shots: 3, canFly: true },
-  thorn: { hp: 40, speed: 39, radius: 14, xp: 3, damage: 12, color: '#80964c', form: 'thorn', name: '缠根囊', skill: 'root', skillEvery: 3.5, skillRange: 300, shotKind: 'root', shotSpeed: 132 },
-  infantry: { hp: 82, speed: 54, radius: 17, xp: 3, damage: 16, color: '#7188a1', form: 'infantry', name: '中世纪步兵', skill: 'throw', skillEvery: 2.65, skillRange: 285, shotKind: 'spear', shotSpeed: 255 },
-  mutant: { hp: 76, speed: 43, radius: 19, xp: 4, damage: 15, color: '#d16e48', form: 'mutant', name: '熔岩蜥', skill: 'dash', skillEvery: 3.7, skillRange: 265 },
-  reclaimer: { hp: 42, speed: 82, radius: 13, xp: 2, damage: 12, color: '#ab7058', form: 'reclaimer', name: '灰烬猎犬', skill: 'fan', skillEvery: 3.2, skillRange: 285, shotKind: 'ash', shotSpeed: 190, shots: 5, shotSpread: .22 },
-  wisp: { hp: 28, speed: 86, radius: 11, xp: 3, damage: 11, color: '#ed8a4e', form: 'wisp', name: '熔灰飞灵', skill: 'fire', skillEvery: 2.8, skillRange: 310, shotKind: 'fire', shotSpeed: 205, canFly: true },
-  tideBoss: { hp: 620, speed: 39, radius: 42, xp: 14, damage: 20, color: '#62aeb8', form: 'boss', name: '潮涌巨蟹', skill: 'tide', skillEvery: 3.65, skillRange: 340, shotKind: 'goo', shotSpeed: 185, shots: 7, shotSpread: .42, sprite: 'tideBoss' },
-  groveBoss: { hp: 720, speed: 35, radius: 44, xp: 16, damage: 23, color: '#92ad59', form: 'boss', name: '古木守卫', skill: 'grove', skillEvery: 3.15, skillRange: 350, shotKind: 'root', shotSpeed: 190, shots: 5, shotSpread: .18, sprite: 'groveBoss' },
-  reversionBoss: { hp: 820, speed: 45, radius: 46, xp: 18, damage: 25, color: '#e77c45', form: 'boss', name: '赤焰巨猿', skill: 'pulse', skillEvery: 4.4, skillRange: 300, skillRadius: 175, skillPower: 1.28, shotKind: 'fire', shotSpeed: 215, shots: 5, shotSpread: .2 },
+  amoeba: { hp: 24, speed: 56, radius: 12, xp: 1, score: 8, damage: 8, color: '#76b7a3', form: 'blob', name: '潮池异螺', skill: 'spit', skillEvery: 2.9, skillRange: 265, shotKind: 'goo', shotSpeed: 150, shots: 2, shotSpread: .2 },
+  leech: { hp: 18, speed: 90, radius: 8, xp: 1, score: 6, damage: 7, color: '#d5a764', form: 'spore', name: '砂砾虫', skill: 'dash', skillEvery: 3.1, skillRange: 235 },
+  crab: { hp: 58, speed: 43, radius: 17, xp: 3, score: 24, damage: 13, color: '#4f8190', form: 'crab', name: '礁甲蟹', skill: 'pulse', skillEvery: 4.1, skillRange: 105, skillRadius: 90, skillPower: 1 },
+  savage: { hp: 46, speed: 72, radius: 15, xp: 2, score: 16, damage: 11, color: '#b56b36', form: 'savage', name: '野人', skill: 'dash', skillEvery: 2.45, skillRange: 250 },
+  beetle: { hp: 52, speed: 48, radius: 15, xp: 3, score: 22, damage: 12, color: '#78aa54', form: 'shell', name: '苔甲虫', skill: 'shell', skillEvery: 4.3, skillRange: Infinity },
+  moth: { hp: 23, speed: 106, radius: 10, xp: 2, score: 14, damage: 8, color: '#c0cd72', form: 'wing', name: '叶翼飞虫', skill: 'fan', skillEvery: 3.1, skillRange: 290, shotKind: 'spore', shotSpeed: 175, shots: 3, canFly: true },
+  thorn: { hp: 40, speed: 39, radius: 14, xp: 3, score: 20, damage: 12, color: '#80964c', form: 'thorn', name: '缠根囊', skill: 'root', skillEvery: 3.5, skillRange: 300, shotKind: 'root', shotSpeed: 132 },
+  infantry: { hp: 82, speed: 54, radius: 17, xp: 3, score: 28, damage: 16, color: '#7188a1', form: 'infantry', name: '中世纪步兵', skill: 'throw', skillEvery: 2.65, skillRange: 285, shotKind: 'spear', shotSpeed: 255 },
+  mutant: { hp: 76, speed: 43, radius: 19, xp: 4, score: 36, damage: 15, color: '#d16e48', form: 'mutant', name: '熔岩蜥', skill: 'dash', skillEvery: 3.7, skillRange: 265 },
+  reclaimer: { hp: 42, speed: 82, radius: 13, xp: 2, score: 18, damage: 12, color: '#ab7058', form: 'reclaimer', name: '灰烬猎犬', skill: 'fan', skillEvery: 3.2, skillRange: 285, shotKind: 'ash', shotSpeed: 190, shots: 5, shotSpread: .22 },
+  wisp: { hp: 28, speed: 86, radius: 11, xp: 3, score: 25, damage: 11, color: '#ed8a4e', form: 'wisp', name: '熔灰飞灵', skill: 'fire', skillEvery: 2.8, skillRange: 310, shotKind: 'fire', shotSpeed: 205, canFly: true },
+  tideBoss: { hp: 620, speed: 39, radius: 42, xp: 14, score: 180, damage: 20, color: '#62aeb8', form: 'boss', name: '潮涌巨蟹', skill: 'tide', skillEvery: 3.65, skillRange: 340, shotKind: 'goo', shotSpeed: 185, shots: 7, shotSpread: .42, sprite: 'tideBoss' },
+  groveBoss: { hp: 720, speed: 35, radius: 44, xp: 16, score: 240, damage: 23, color: '#92ad59', form: 'boss', name: '古木守卫', skill: 'grove', skillEvery: 3.15, skillRange: 350, shotKind: 'root', shotSpeed: 190, shots: 5, shotSpread: .18, sprite: 'groveBoss' },
+  reversionBoss: { hp: 820, speed: 45, radius: 46, xp: 18, score: 320, damage: 25, color: '#e77c45', form: 'boss', name: '赤焰巨猿', skill: 'pulse', skillEvery: 4.4, skillRange: 300, skillRadius: 175, skillPower: 1.28, shotKind: 'fire', shotSpeed: 215, shots: 5, shotSpread: .2 },
 };
 
 const ENEMY_SHOT_STYLES = {
@@ -195,6 +195,10 @@ function enemyStats(kind, hpScale = 1, damageScale = 1, speedScale = 1) {
     damage: Math.max(1, Math.round(base.damage * damageScale)),
     speed: base.speed * speedScale,
   };
+}
+
+function enemyScore(enemy, difficulty = DIFFICULTIES.normal) {
+  return Math.max(1, Math.round((enemy.score ?? enemy.xp * 10) * (difficulty.scoreMultiplier ?? 1)));
 }
 
 const SPRITE_FRAMES = [
@@ -306,8 +310,8 @@ const RELIC_BUILDING_SITES = [
   { x: 340, y: 760, hp: 150, r: 40, skill: 'ward', name: '祖灵石碑' },
 ];
 const ACTIVE_SKILL_MAX_LEVEL = 10;
-const RELIC_RESPAWN_INTERVAL = 13;
-const RELIC_MAX_ACTIVE = 6;
+const RELIC_RESPAWN_INTERVAL = 7;
+const RELIC_MAX_ACTIVE = 9;
 
 function makeRelicBuilding(site, x = site.x, y = site.y, terrain = 'shore') {
   return { ...site, x, y, terrain, maxHp: site.hp, hit: 0, isBuilding: true };
@@ -320,6 +324,41 @@ function makeRelicBuildings(terrain = 'shore') {
 function activeSkillCooldown(player, id) {
   const skill = ACTIVE_SKILLS[id];
   return Math.max(skill.cooldown * .55, skill.cooldown - (player[`${id}Level`] || 0) * skill.cooldownStep);
+}
+
+const XP_PER_GEM = 1;
+const LEADERBOARD_KEY = 'civilization-fire-leaderboard-v1';
+const LEADERBOARD_LIMIT = 20;
+
+function leaderboardStorage() {
+  try { return globalThis.localStorage || null; } catch { return null; }
+}
+
+function normalizePlayerName(name) {
+  return String(name || '').trim().replace(/\s+/g, ' ').slice(0, 16) || '玩家';
+}
+
+function readLeaderboard(storage = leaderboardStorage()) {
+  if (!storage) return [];
+  try {
+    const rows = JSON.parse(storage.getItem(LEADERBOARD_KEY) || '[]');
+    if (!Array.isArray(rows)) return [];
+    return rows.filter(row => row && Number.isFinite(Number(row.score)) && row.name)
+      .map(row => ({ name: normalizePlayerName(row.name), score: Math.max(0, Math.floor(Number(row.score))), difficulty: String(row.difficulty || '中'), time: Math.max(0, Math.floor(Number(row.time) || 0)), at: Number(row.at) || 0 }))
+      .sort((a, b) => b.score - a.score || a.at - b.at)
+      .slice(0, LEADERBOARD_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function saveLeaderboardEntry(name, score, difficulty, time, storage = leaderboardStorage()) {
+  const row = { name: normalizePlayerName(name), score: Math.max(0, Math.floor(Number(score) || 0)), difficulty: String(difficulty || '中'), time: Math.max(0, Math.floor(Number(time) || 0)), at: Date.now() };
+  const rows = [...readLeaderboard(storage), row].sort((a, b) => b.score - a.score || a.at - b.at).slice(0, LEADERBOARD_LIMIT);
+  if (storage) {
+    try { storage.setItem(LEADERBOARD_KEY, JSON.stringify(rows)); } catch { /* private mode / quota full: keep the run visible in memory */ }
+  }
+  return rows;
 }
 
 const MUSIC_LOOP_SECONDS = 8;
@@ -398,6 +437,8 @@ function createMusicLoop(context, stage = 0) {
     for (let beat = 0; beat < 4; beat += 1) {
       const beatStart = start + beat * .5;
       addTone(beatStart, .3, profile.bass[bar] + (beat === 2 ? 7 : 12), .035 + energy * .027, .2 + energy * .28);
+      if (energy > .08) addTone(beatStart, .055, profile.bass[bar] - 24, .008 + energy * .018, .05);
+      if (energy > .35 && beat % 2 === 1) addTone(beatStart + .25, .045, profile.bass[bar] - 17, .010 + energy * .020, .15);
       if (energy > .32) addTone(beatStart + .18, .08, profile.bass[bar] - 12, .018 + energy * .035, .72);
       if (energy > .5) addTone(beatStart + .25, .06, profile.bass[bar] - 19, .012 + energy * .022, .86);
       if (energy > .68) addTone(beatStart + .36, .055, profile.bass[bar] + 19, .016 + energy * .028, .58);
@@ -561,7 +602,7 @@ class Game {
     this.bullets = [];
     this.enemyBullets = [];
     this.buildings = makeRelicBuildings(BIOMES[this.biomeIndex].terrain);
-    this.relicTimer = 8;
+    this.relicTimer = 4;
     this.gems = [];
     this.pickups = [];
     this.particles = [];
@@ -588,6 +629,7 @@ class Game {
     this.dom.ward.hidden = false;
     this.dom.joystick.hidden = false;
     this.joystick = null;
+    this.dom.joystickKnob.style.transform = 'translate(0, 0)';
     this.updateNovaButton();
     this.updateSkillButtons();
   }
@@ -606,6 +648,7 @@ class Game {
     this.keys.clear();
     this.pointer = null;
     this.joystick = null;
+    this.dom.joystickKnob.style.transform = 'translate(0, 0)';
     this.dom.nova.hidden = true;
     this.dom.dash.hidden = true;
     this.dom.spear.hidden = true;
@@ -665,17 +708,6 @@ class Game {
       const rect = this.canvas.getBoundingClientRect();
       return { x: event.clientX - rect.left, y: event.clientY - rect.top };
     };
-    this.canvas.addEventListener('pointerdown', event => {
-      if (this.state !== 'playing') return;
-      this.canvas.setPointerCapture(event.pointerId);
-      this.pointer = { id: event.pointerId, ...point(event) };
-    });
-    this.canvas.addEventListener('pointermove', event => {
-      if (this.pointer?.id === event.pointerId) Object.assign(this.pointer, point(event));
-    });
-    const release = event => { if (this.pointer?.id === event.pointerId) this.pointer = null; };
-    this.canvas.addEventListener('pointerup', release);
-    this.canvas.addEventListener('pointercancel', release);
     const joystickOffset = event => {
       const rect = this.dom.joystick.getBoundingClientRect();
       return { x: event.clientX - (rect.left + rect.width / 2), y: event.clientY - (rect.top + rect.height / 2) };
@@ -691,21 +723,51 @@ class Game {
       this.joystick = null;
       this.dom.joystickKnob.style.transform = 'translate(0, 0)';
     };
-    this.dom.joystick.addEventListener('pointerdown', event => {
+    this.canvas.addEventListener('pointerdown', event => {
       if (this.state !== 'playing') return;
+      if (this.pointer) return;
       event.preventDefault();
-      this.dom.joystick.setPointerCapture(event.pointerId);
+      this.pointer = { id: event.pointerId, ...point(event) };
+    });
+    const movePointer = event => {
+      if (this.pointer?.id === event.pointerId) Object.assign(this.pointer, point(event));
+      if (this.joystick?.id === event.pointerId) updateJoystick(event);
+    };
+    const releasePointer = event => {
+      if (this.pointer?.id === event.pointerId) this.pointer = null;
+      releaseJoystick(event);
+    };
+    window.addEventListener('pointermove', movePointer);
+    window.addEventListener('pointerup', releasePointer);
+    window.addEventListener('pointercancel', releasePointer);
+    this.dom.joystick.addEventListener('pointerdown', event => {
+      if (this.state !== 'playing' || this.joystick) return;
+      event.preventDefault();
       updateJoystick(event);
     });
-    this.dom.joystick.addEventListener('pointermove', event => {
-      if (this.joystick?.id === event.pointerId) updateJoystick(event);
-    });
-    this.dom.joystick.addEventListener('pointerup', releaseJoystick);
-    this.dom.joystick.addEventListener('pointercancel', releaseJoystick);
-    this.dom.nova.addEventListener('click', () => this.nova());
-    this.dom.dash.addEventListener('click', () => this.dash());
-    this.dom.spear.addEventListener('click', () => this.throwSpear());
-    this.dom.ward.addEventListener('click', () => this.castWard());
+    const bindActionButton = (button, action) => {
+      let lastActivation = 0;
+      const invoke = event => {
+        const now = Date.now();
+        if (now - lastActivation < 80) return;
+        lastActivation = now;
+        event?.preventDefault();
+        action();
+      };
+      button.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        invoke(event);
+      });
+      button.addEventListener('touchstart', invoke, { passive: false });
+      button.addEventListener('click', event => {
+        if (Date.now() - lastActivation < 500) { event.preventDefault(); return; }
+        invoke(event);
+      });
+    };
+    bindActionButton(this.dom.nova, () => this.nova());
+    bindActionButton(this.dom.dash, () => this.dash());
+    bindActionButton(this.dom.spear, () => this.throwSpear());
+    bindActionButton(this.dom.ward, () => this.castWard());
   }
 
   spawnEnemy() {
@@ -1014,7 +1076,7 @@ class Game {
     if (this.buildings.length >= RELIC_MAX_ACTIVE) return;
     this.relicTimer -= dt;
     if (this.relicTimer > 0) return;
-    this.relicTimer = RELIC_RESPAWN_INTERVAL + Math.random() * 4;
+    this.relicTimer = RELIC_RESPAWN_INTERVAL + Math.random() * 2;
     this.spawnRelicBuilding();
   }
 
@@ -1071,7 +1133,7 @@ class Game {
 
   killEnemy(enemy) {
     enemy.dead = true;
-    this.score += enemy.xp * 10;
+    this.score += enemyScore(enemy, this.difficulty);
     this.kills += 1;
     if (enemy.boss) {
       this.particles.push(...Array.from({ length: 45 }, () => ({ x: enemy.x, y: enemy.y, vx: (Math.random() - .5) * 360, vy: (Math.random() - .5) * 360, life: .65 + Math.random() * .4, max: 1, color: Math.random() > .5 ? '#ffd37a' : '#ff749a', size: 2 + Math.random() * 4 })));
@@ -1088,13 +1150,13 @@ class Game {
       this.spawnTimer = .7 / this.difficulty.spawnRate;
       this.enemyBullets = [];
       this.buildings = makeRelicBuildings(BIOMES[this.biomeIndex].terrain);
-      this.relicTimer = 8;
+      this.relicTimer = 4;
       this.setMusicStage(musicStageFor(this.biomeIndex));
       this.rings.push({ x: this.player.x, y: this.player.y, radius: 10, max: 180, life: .75, color: BIOMES[this.biomeIndex].accent });
       return;
     }
     const drops = Math.max(1, Math.ceil(enemy.xp / 2));
-    for (let i = 0; i < drops; i += 1) this.gems.push({ x: enemy.x + (Math.random() - .5) * 12, y: enemy.y + (Math.random() - .5) * 12, r: 5, value: 1, t: Math.random() * 3 });
+    for (let i = 0; i < drops; i += 1) this.gems.push({ x: enemy.x + (Math.random() - .5) * 12, y: enemy.y + (Math.random() - .5) * 12, r: 5, value: XP_PER_GEM, t: Math.random() * 3 });
     if (this.kills % this.difficulty.pickupEvery === 0) {
       const kinds = Object.keys(PICKUPS);
       const kind = kinds[pickupIndex(this.kills, this.difficulty.pickupEvery, kinds.length)];
@@ -1363,12 +1425,45 @@ class Game {
     this.dom.ward.hidden = true;
     this.dom.joystick.hidden = true;
     this.joystick = null;
+    this.dom.joystickKnob.style.transform = 'translate(0, 0)';
     this.dom.endKicker.textContent = victory ? 'EVOLUTION COMPLETE' : 'EVOLUTION INTERRUPTED';
     this.dom.endTitle.textContent = victory ? '文明火种得以延续' : '火种熄灭';
     this.dom.endSummary.textContent = victory
       ? `你在 ${Math.ceil(this.time)} 秒内穿越三种生态，击败 ${this.kills} 个敌对生物，回收 ${this.score} 份基因样本。`
       : `你坚持了 ${Math.ceil(this.time)} 秒，击败 ${this.kills} 个敌对生物，回收 ${this.score} 份基因样本。`;
+    this.dom.finalScore.textContent = String(this.score);
+    try { this.dom.playerName.value = leaderboardStorage()?.getItem('civilization-fire-player-name') || ''; } catch { this.dom.playerName.value = ''; }
+    this.dom.scoreStatus.textContent = '输入名字后保存本轮成绩';
+    this.renderLeaderboard();
     this.dom.end.hidden = false;
+  }
+
+  renderLeaderboard() {
+    const rows = readLeaderboard();
+    this.dom.leaderboard.replaceChildren(...rows.map((row, index) => {
+      const item = document.createElement('li');
+      const name = document.createElement('span');
+      name.textContent = `${index + 1}. ${row.name}`;
+      const score = document.createElement('strong');
+      score.textContent = `${row.score} 分 · ${row.difficulty}`;
+      item.append(name, score);
+      return item;
+    }));
+    if (!rows.length) {
+      const empty = document.createElement('li');
+      empty.className = 'leaderboard-empty';
+      empty.textContent = '还没有历史成绩';
+      this.dom.leaderboard.append(empty);
+    }
+  }
+
+  submitScore(name) {
+    const playerName = normalizePlayerName(name);
+    saveLeaderboardEntry(playerName, this.score, this.difficulty.short, this.time);
+    try { leaderboardStorage()?.setItem('civilization-fire-player-name', playerName); } catch { /* private mode: score still appears this session */ }
+    this.dom.playerName.value = playerName;
+    this.dom.scoreStatus.textContent = '本轮成绩已加入榜单';
+    this.renderLeaderboard();
   }
 
   updateNovaButton() {
@@ -1998,6 +2093,9 @@ class Game {
     ctx.fillStyle = '#eff5dc';
     ctx.font = '800 19px system-ui';
     ctx.fillText(`${String(Math.floor(this.time / 60)).padStart(2, '0')}:${String(Math.floor(this.time % 60)).padStart(2, '0')}`, this.width - 18, 59);
+    ctx.fillStyle = '#ffd27a';
+    ctx.font = '800 13px system-ui';
+    ctx.fillText(`积分 ${this.score}`, this.width - 18, 84);
     ctx.restore();
   }
 
@@ -2093,6 +2191,11 @@ function boot() {
     endKicker: document.querySelector('#end-kicker'),
     endTitle: document.querySelector('#end-title'),
     endSummary: document.querySelector('#end-summary'),
+    finalScore: document.querySelector('#final-score'),
+    scoreForm: document.querySelector('#score-form'),
+    playerName: document.querySelector('#player-name'),
+    scoreStatus: document.querySelector('#score-status'),
+    leaderboard: document.querySelector('#leaderboard'),
     nova: document.querySelector('#nova'),
     dash: document.querySelector('#dash'),
     spear: document.querySelector('#spear'),
@@ -2102,11 +2205,15 @@ function boot() {
   };
   const game = new Game(document.querySelector('#game'), dom);
   dom.difficultyButtons.forEach(button => button.addEventListener('click', () => game.start(button.dataset.difficulty)));
+  dom.scoreForm.addEventListener('submit', event => {
+    event.preventDefault();
+    game.submitScore(dom.playerName.value);
+  });
   dom.restartButton.addEventListener('click', () => game.showDifficulty());
 }
 
 if (typeof document === 'undefined') {
-globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss };
+globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss };
 } else {
   boot();
 }

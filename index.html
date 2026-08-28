@@ -23,7 +23,7 @@
       }
       .overlay[hidden] { display: none; }
       .panel {
-        width: min(100%, 370px); padding: 26px 22px; border: 1px solid rgba(173, 211, 147, .42);
+        width: min(100%, 370px); max-height: calc(100% - 24px); overflow: auto; padding: 26px 22px; border: 1px solid rgba(173, 211, 147, .42);
         border-radius: 24px; background: linear-gradient(145deg, rgba(24, 59, 43, .96), rgba(7, 22, 16, .96));
         box-shadow: 0 18px 60px rgba(0, 0, 0, .42); text-align: center;
       }
@@ -96,6 +96,17 @@
       .active-skill[hidden] { display: none; }
       .active-skill[data-ready="false"] { filter: saturate(.2) brightness(.65); }
       .active-skill small { display: block; margin-top: 2px; font-size: 9px; font-weight: 700; }
+      .score-card { margin: 12px 0 14px; padding: 10px 12px; border-radius: 14px; background: rgba(255, 210, 122, .11); color: #ffe1a2; }
+      .score-card strong { display: block; margin-top: 2px; font-size: 25px; }
+      #score-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 14px; }
+      #player-name { min-width: 0; border: 1px solid rgba(180, 222, 152, .4); border-radius: 12px; padding: 0 12px; color: #f5f7ff; background: rgba(0, 0, 0, .2); font: inherit; }
+      #score-form button { min-height: 43px; padding: 9px 12px; font-size: 12px; }
+      #score-status { min-height: 17px; margin: -6px 0 10px; color: #b8d9bd; font-size: 11px; }
+      .leaderboard-title { margin: 12px 0 6px; color: #d9edc3; font-size: 14px; text-align: left; }
+      #leaderboard { display: grid; gap: 5px; max-height: 164px; overflow: auto; margin: 0; padding: 0; list-style: none; text-align: left; }
+      #leaderboard li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 8px; background: rgba(140, 187, 107, .1); color: #d7e7d1; font-size: 11px; }
+      #leaderboard li strong { color: #ffd27a; font-size: 11px; white-space: nowrap; }
+      #leaderboard .leaderboard-empty { justify-content: center; color: #9fb6a4; }
       #dash { bottom: max(22px, env(safe-area-inset-bottom)); }
       #spear { bottom: max(96px, calc(env(safe-area-inset-bottom) + 74px)); }
       #ward { left: 92px; bottom: max(22px, env(safe-area-inset-bottom)); }
@@ -145,10 +156,18 @@
           <p class="eyebrow" id="end-kicker">RUN OVER</p>
           <h2 id="end-title">演化中止</h2>
           <p class="intro" id="end-summary"></p>
+          <div class="score-card">本轮积分<strong id="final-score">0</strong></div>
+          <form id="score-form">
+            <input id="player-name" maxlength="16" autocomplete="nickname" placeholder="输入玩家名字" aria-label="玩家名字" />
+            <button type="submit">保存成绩</button>
+          </form>
+          <p id="score-status" aria-live="polite"></p>
+          <h3 class="leaderboard-title">历史积分榜</h3>
+          <ol id="leaderboard" aria-label="历史积分榜"></ol>
           <button id="restart-button">返回难度选择</button>
         </div>
       </section>
     </main>
-    <script src="./game.mjs?v=20260828-6"></script>
+    <script src="./game.mjs?v=20260828-7"></script>
   </body>
 </html>
