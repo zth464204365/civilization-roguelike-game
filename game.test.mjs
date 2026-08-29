@@ -16,6 +16,8 @@ assert.equal(joystickVector(100, 0).y, 0);
 const diagonalJoystick = joystickVector(100, 100);
 assert.ok(Math.abs(Math.hypot(diagonalJoystick.x, diagonalJoystick.y) - 1) < 0.000001);
 assert.equal(gameSource.includes('setPointerCapture'), false);
+assert.ok(gameSource.includes('this.loadBiomeSprites(0)'));
+assert.equal(gameSource.includes('for (const [kind, art] of Object.entries(ENEMY_ART))'), false);
 assert.deepEqual(Array.from(chooseUnique(['a', 'b', 'c'], 3, () => 0)), ['a', 'b', 'c']);
 assert.equal(new Set(chooseUnique(['a', 'b', 'c'], 3)).size, 3);
 assert.equal(enemyStats('reversionBoss', 1.2).hp, 984);
@@ -81,14 +83,14 @@ assert.deepEqual({ x: makeRelicBuilding(RELIC_BUILDING_SITES[0], 12, 34).x, y: m
 assert.ok(RELIC_RESPAWN_INTERVAL <= 8 && RELIC_MAX_ACTIVE >= 9);
 assert.equal(ACTIVE_SKILL_MAX_LEVEL, 10);
 assert.equal(XP_PER_GEM, 1);
-assert.equal(VAMPIRE_HEAL_PER_HIT, 2);
+assert.equal(VAMPIRE_HEAL_PER_HIT, 1);
 assert.ok(VAMPIRE_RUNE_CHANCE > 0 && VAMPIRE_RUNE_CHANCE < 1);
 const vampirePlayer = { hp: 50, maxHp: 100, vampireLevel: 0 };
 applyPickup(vampirePlayer, 'vampire');
 applyPickup(vampirePlayer, 'vampire');
 assert.equal(vampirePlayer.vampireLevel, 2);
-assert.equal(applyVampireHeal(vampirePlayer, vampirePlayer.vampireLevel), 4);
-assert.equal(vampirePlayer.hp, 54);
+assert.equal(applyVampireHeal(vampirePlayer, vampirePlayer.vampireLevel), 2);
+assert.equal(vampirePlayer.hp, 52);
 assert.equal(enemyScore(enemyStats('mutant'), difficultyFor('normal')), 36);
 assert.ok(enemyScore(enemyStats('mutant'), difficultyFor('harsh')) > enemyScore(enemyStats('mutant'), difficultyFor('gentle')));
 assert.equal(LEADERBOARD_LIMIT, 20);
@@ -170,7 +172,7 @@ applyPickup(bonusPickupPlayer, 'haste');
 applyPickup(bonusPickupPlayer, 'ward');
 assert.deepEqual(bonusPickupPlayer, { hp: 100, maxHp: 100, nova: 0, pierce: 0, haste: 8, invuln: 3 });
 assert.equal(musicFrequency(0), 110);
-assert.ok(MUSIC_GAIN >= .84);
+assert.ok(MUSIC_GAIN >= 1.10);
 assert.ok(MUSIC_STAGES[0].energy < MUSIC_STAGES[5].energy);
 const fakeAudioContext = {
   sampleRate: 100,

@@ -1,7 +1,7 @@
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const JOYSTICK_MAX = 32;
-const VAMPIRE_HEAL_PER_HIT = 2;
-const VAMPIRE_RUNE_CHANCE = .08;
+const VAMPIRE_HEAL_PER_HIT = 1;
+const VAMPIRE_RUNE_CHANCE = .05;
 function joystickVector(offsetX, offsetY, max = JOYSTICK_MAX) {
   const distance = Math.hypot(offsetX, offsetY);
   if (!distance || max <= 0) return { x: 0, y: 0 };
@@ -69,7 +69,7 @@ function applyPickup(player, kind) {
   }
   if (kind === 'vampire') {
     player.vampireLevel = (player.vampireLevel || 0) + 1;
-    return { text: `吸血符文 · 命中回复 ${player.vampireLevel * VAMPIRE_HEAL_PER_HIT}`, color: '#e78aa8' };
+    return { text: `吸血符文 +1 · 命中回复 ${player.vampireLevel * VAMPIRE_HEAL_PER_HIT}`, color: '#e78aa8' };
   }
   player.pierce += 1;
   return { text: '兽骨 · 穿透 +1', color: '#d9e3be' };
@@ -376,7 +376,7 @@ function saveLeaderboardEntry(name, score, difficulty, time, storage = leaderboa
 }
 
 const MUSIC_LOOP_SECONDS = 8;
-const MUSIC_GAIN = .84;
+const MUSIC_GAIN = 1.10;
 const MUSIC_STAGES = [
   { energy: .10, bass: [-12, -8, -5, -10], melody: [7, 10, 12, 10, 7, 5, 3, 5, 10, 12, 15, 12, 10, 7, 5, 3] },
   { energy: .26, bass: [-10, -7, -3, -8], melody: [5, 8, 10, 12, 10, 8, 5, 3, 8, 10, 13, 12, 10, 8, 5, 1] },
@@ -489,43 +489,49 @@ class Game {
     this.sprite = new Image();
     this.spriteReady = false;
     this.sprite.addEventListener('load', () => { this.spriteReady = true; });
+    this.sprite.addEventListener('error', () => { console.warn('贴图加载失败：evolution-guide.png'); });
     this.sprite.src = './assets/evolution-guide.png?v=20260825-3';
     this.enemySprites = {};
-    for (const [kind, art] of Object.entries(ENEMY_ART)) {
-      const image = new Image();
-      const sprite = { image, ready: false, frame: art.frame, frames: art.frames, scale: art.scale, size: art.size };
-      image.addEventListener('load', () => { sprite.ready = true; });
-      image.src = art.source;
-      this.enemySprites[kind] = sprite;
-    }
     this.obstacleSprites = {};
-    for (const [terrain, art] of Object.entries(OBSTACLE_ART)) {
-      const image = new Image();
-      const sprite = { image, ready: false };
-      image.addEventListener('load', () => { sprite.ready = true; });
-      image.src = art.source;
-      this.obstacleSprites[terrain] = sprite;
-    }
     this.relicSprites = {};
-    for (const [terrain, art] of Object.entries(RELIC_ART)) {
-      const image = new Image();
-      const sprite = { image, ready: false };
-      image.addEventListener('load', () => { sprite.ready = true; });
-      image.src = art.source;
-      this.relicSprites[terrain] = sprite;
-    }
     this.effectSprites = {};
-    for (const [kind, art] of Object.entries(EFFECT_ART)) {
-      const image = new Image();
-      const sprite = { image, ready: false };
-      image.addEventListener('load', () => { sprite.ready = true; });
-      image.src = art.source;
-      this.effectSprites[kind] = sprite;
-    }
+    this.loadBiomeSprites(0);
+    this.loadEffectSprite('fan');
+    this.loadEffectSprite('hurricane');
     this.resize();
     this.bindInput();
     window.addEventListener('resize', () => this.resize());
     requestAnimationFrame(time => this.frame(time));
+  }
+
+  loadSprite(store, key, art) {
+    if (store[key] || !art) return store[key];
+    const image = new Image();
+    const sprite = { image, ready: false, failed: false, ...art };
+    image.addEventListener('load', () => { sprite.ready = true; });
+    image.addEventListener('error', () => {
+      sprite.failed = true;
+      console.warn(`贴图加载失败：${art.source}`);
+    });
+    image.src = art.source;
+    store[key] = sprite;
+    return sprite;
+  }
+
+  loadEnemySprite(kind) {
+    return this.loadSprite(this.enemySprites, kind, ENEMY_ART[kind]);
+  }
+
+  loadEffectSprite(kind) {
+    return this.loadSprite(this.effectSprites, kind, EFFECT_ART[kind]);
+  }
+
+  loadBiomeSprites(index) {
+    const biome = BIOMES[index];
+    if (!biome) return;
+    biome.enemies.forEach(kind => this.loadEnemySprite(kind));
+    this.loadSprite(this.obstacleSprites, biome.terrain, OBSTACLE_ART[biome.terrain]);
+    this.loadSprite(this.relicSprites, biome.terrain, RELIC_ART[biome.terrain]);
   }
 
   startMusic() {
@@ -611,6 +617,7 @@ class Game {
     this.bossSpawned = false;
     this.boss = null;
     this.biomeIndex = 0;
+    this.loadBiomeSprites(this.biomeIndex);
     this.stageTime = 0;
     this.biomeNotice = 3;
     this.enemies = [];
@@ -792,6 +799,7 @@ class Game {
     const difficulty = 1 + this.time * .0085;
     const biome = BIOMES[this.biomeIndex];
     const kind = biome.enemies[Math.floor(Math.random() * biome.enemies.length)];
+    this.loadEnemySprite(kind);
     const s = enemyStats(kind, difficulty * this.difficulty.hp, this.difficulty.damage * (1 + this.time * .0015), this.difficulty.speed * (1 + this.time * .00055));
     const margin = s.radius + 72;
     let p;
@@ -808,6 +816,8 @@ class Game {
 
   spawnBoss() {
     const kind = BIOMES[this.biomeIndex].boss;
+    this.loadEnemySprite(kind);
+    this.loadEffectSprite(BOSS_SHOT_ART[kind]?.sprite);
     const s = enemyStats(kind, (1 + this.time * .0055) * this.difficulty.hp, this.difficulty.damage * (1 + this.time * .0015), this.difficulty.speed * (1 + this.time * .00055));
     let x = this.player.x;
     const y = this.player.y - Math.max(this.width, this.height) * .7;
@@ -1164,6 +1174,7 @@ class Game {
       this.bossSpawned = false;
       this.stageTime = 0;
       this.biomeIndex = nextBiome;
+      this.loadBiomeSprites(this.biomeIndex);
       this.biomeNotice = 3.4;
       this.spawnTimer = .7 / this.difficulty.spawnRate;
       this.enemyBullets = [];
@@ -1186,6 +1197,7 @@ class Game {
   fireEnemyShots(enemy, dx, dy) {
     const style = ENEMY_SHOT_STYLES[enemy.shotKind];
     const bossArt = bossShotArt(enemy);
+    if (bossArt) this.loadEffectSprite(bossArt.sprite);
     const count = enemy.shots || (enemy.skill === 'fan' ? 3 : 1);
     const base = Math.atan2(dy, dx);
     const spread = count > 1 ? enemy.shotSpread ?? .28 : 0;
@@ -1205,6 +1217,7 @@ class Game {
     if (this.enemyBullets.length >= 36) return;
     const range = Math.min(72, Math.max(40, distance - 24));
     const bossArt = bossShotArt(enemy);
+    if (!bossArt) this.loadEffectSprite('venom');
     this.enemyBullets.push({ kind: 'root', x: enemy.x + dx / distance * range, y: enemy.y + dy / distance * range, vx: 0, vy: 0, r: 20, damage: enemy.damage * .58, slow: 1.65, life: 2.2, zone: true, bossArt: bossArt?.id || null, bossSprite: bossArt?.sprite || null });
     this.rings.push({ x: enemy.x + dx / distance * range, y: enemy.y + dy / distance * range, radius: 6, max: 34, life: .35, color: '#a8d86b' });
   }
