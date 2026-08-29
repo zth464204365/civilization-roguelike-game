@@ -1,7 +1,37 @@
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const JOYSTICK_MAX = 32;
-const VAMPIRE_HEAL_PER_HIT = 1;
-const VAMPIRE_RUNE_CHANCE = .05;
+const VAMPIRE_HEAL_PER_HIT = .2;
+const VAMPIRE_RUNE_CHANCE = .02;
+const RUNE_CONFIG = {
+  vampire: { key: 'vampireLevel', name: '吸血符文', chance: VAMPIRE_RUNE_CHANCE, max: 5, color: '#d96f97' },
+  rage: { key: 'rageRune', name: '战意符文', chance: .009, max: 6, color: '#ec9966' },
+  shell: { key: 'shellRune', name: '岩甲符文', chance: .008, max: 5, color: '#93b7d8' },
+  wind: { key: 'windRune', name: '疾风符文', chance: .008, max: 5, color: '#9dde83' },
+  echo: { key: 'echoRune', name: '回响符文', chance: .006, max: 5, color: '#c6a7ef' },
+};
+const RUNE_KINDS = Object.keys(RUNE_CONFIG);
+
+function runeLevel(player, kind) {
+  const config = RUNE_CONFIG[kind];
+  return config ? Math.max(0, Math.floor(player?.[config.key] || 0)) : 0;
+}
+
+function rollRune(player = {}, random = Math.random) {
+  let threshold = 0;
+  const roll = random();
+  for (const kind of RUNE_KINDS) {
+    const config = RUNE_CONFIG[kind];
+    if (runeLevel(player, kind) >= config.max) continue;
+    threshold += config.chance;
+    if (roll < threshold) return kind;
+  }
+  return null;
+}
+
+function formatRuneNumber(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function joystickVector(offsetX, offsetY, max = JOYSTICK_MAX) {
   const distance = Math.hypot(offsetX, offsetY);
   if (!distance || max <= 0) return { x: 0, y: 0 };
@@ -67,16 +97,22 @@ function applyPickup(player, kind) {
     player.invuln = Math.max(player.invuln, 3);
     return { text: '祖灵护符 · 无敌 3 秒', color: '#aabdf5' };
   }
-  if (kind === 'vampire') {
-    player.vampireLevel = (player.vampireLevel || 0) + 1;
-    return { text: `吸血符文 +1 · 命中回复 ${player.vampireLevel * VAMPIRE_HEAL_PER_HIT}`, color: '#e78aa8' };
+  if (RUNE_CONFIG[kind]) {
+    const config = RUNE_CONFIG[kind];
+    const level = Math.min(config.max, runeLevel(player, kind) + 1);
+    player[config.key] = level;
+    if (kind === 'vampire') return { text: `吸血符文 +1 · 命中回复 ${formatRuneNumber(level * VAMPIRE_HEAL_PER_HIT)} 点`, color: config.color };
+    if (kind === 'rage') return { text: `战意符文 +1 · 全部伤害 +${level * 3}%`, color: config.color };
+    if (kind === 'shell') return { text: `岩甲符文 +1 · 受伤 -${formatRuneNumber(level * 2.5)}%`, color: config.color };
+    if (kind === 'wind') return { text: `疾风符文 +1 · 移速 +${level * 3}%`, color: config.color };
+    return { text: `回响符文 +1 · 主动技能冷却 -${level * 3}%`, color: config.color };
   }
   player.pierce += 1;
   return { text: '兽骨 · 穿透 +1', color: '#d9e3be' };
 }
 
 function applyVampireHeal(player, stacks) {
-  const amount = Math.max(0, Math.floor(stacks || 0)) * VAMPIRE_HEAL_PER_HIT;
+  const amount = Math.max(0, Number(stacks) || 0) * VAMPIRE_HEAL_PER_HIT;
   const before = player.hp;
   player.hp = Math.min(player.maxHp, player.hp + amount);
   return player.hp - before;
@@ -94,9 +130,9 @@ function chooseUnique(items, count, random = Math.random) {
 const TAU = Math.PI * 2;
 const BIOME_DURATION = 40;
 const DIFFICULTIES = {
-  gentle: { label: '游猎', short: '简', hp: .84, damage: .76, speed: .94, spawnRate: .84, hitInvuln: .65, pickupEvery: 4, scoreMultiplier: .8, description: '敌人较弱，出现较慢' },
-  normal: { label: '迁徙', short: '中', hp: 1.08, damage: 1.12, speed: 1.03, spawnRate: 1.12, hitInvuln: .5, pickupEvery: 5, scoreMultiplier: 1, description: '敌人更强，攻势更密集' },
-  harsh: { label: '试炼', short: '难', hp: 1.42, damage: 1.48, speed: 1.12, spawnRate: 1.38, hitInvuln: .42, pickupEvery: 6, scoreMultiplier: 1.35, description: '敌人凶猛，补给稀少' },
+  gentle: { label: '游猎', short: '简', hp: .84, damage: .76, speed: .90, spawnRate: .84, hitInvuln: .65, pickupEvery: 4, scoreMultiplier: .8, description: '敌人较弱、较慢，出现较少' },
+  normal: { label: '迁徙', short: '中', hp: 1.08, damage: 1.12, speed: 1, spawnRate: 1.12, hitInvuln: .5, pickupEvery: 5, scoreMultiplier: 1, description: '敌人更强，攻势更密集' },
+  harsh: { label: '试炼', short: '难', hp: 1.42, damage: 1.48, speed: 1.13, spawnRate: 1.38, hitInvuln: .42, pickupEvery: 6, scoreMultiplier: 1.35, description: '敌人更快凶猛，补给稀少' },
 };
 
 function difficultyFor(id) {
@@ -162,13 +198,13 @@ function enemyVisualScale(enemy, art) {
 
 const ENEMY_TYPES = {
   amoeba: { hp: 24, speed: 56, radius: 12, xp: 1, score: 8, damage: 8, color: '#76b7a3', form: 'blob', name: '潮池异螺', skill: 'spit', skillEvery: 2.9, skillRange: 265, shotKind: 'goo', shotSpeed: 150, shots: 2, shotSpread: .2 },
-  leech: { hp: 18, speed: 90, radius: 8, xp: 1, score: 6, damage: 7, color: '#d5a764', form: 'spore', name: '砂砾虫', skill: 'dash', skillEvery: 3.1, skillRange: 235 },
+  leech: { hp: 18, speed: 90, radius: 8, xp: 1, score: 6, damage: 7, color: '#d5a764', form: 'spore', name: '砂砾虫', skill: 'dash', skillEvery: 3.1, skillRange: 235, enrages: true },
   crab: { hp: 58, speed: 43, radius: 17, xp: 3, score: 24, damage: 13, color: '#4f8190', form: 'crab', name: '礁甲蟹', skill: 'pulse', skillEvery: 4.1, skillRange: 105, skillRadius: 90, skillPower: 1 },
-  savage: { hp: 46, speed: 72, radius: 15, xp: 2, score: 16, damage: 11, color: '#b56b36', form: 'savage', name: '野人', skill: 'dash', skillEvery: 2.45, skillRange: 250 },
+  savage: { hp: 46, speed: 72, radius: 15, xp: 2, score: 16, damage: 11, color: '#b56b36', form: 'savage', name: '野人', skill: 'dash', skillEvery: 2.45, skillRange: 250, enrages: true },
   beetle: { hp: 52, speed: 48, radius: 15, xp: 3, score: 22, damage: 12, color: '#78aa54', form: 'shell', name: '苔甲虫', skill: 'shell', skillEvery: 4.3, skillRange: Infinity },
   moth: { hp: 23, speed: 106, radius: 10, xp: 2, score: 14, damage: 8, color: '#c0cd72', form: 'wing', name: '叶翼飞虫', skill: 'fan', skillEvery: 3.1, skillRange: 290, shotKind: 'spore', shotSpeed: 175, shots: 3, canFly: true },
   thorn: { hp: 40, speed: 39, radius: 14, xp: 3, score: 20, damage: 12, color: '#80964c', form: 'thorn', name: '缠根囊', skill: 'root', skillEvery: 3.5, skillRange: 300, shotKind: 'root', shotSpeed: 132 },
-  infantry: { hp: 82, speed: 54, radius: 17, xp: 3, score: 28, damage: 16, color: '#7188a1', form: 'infantry', name: '中世纪步兵', skill: 'throw', skillEvery: 2.65, skillRange: 285, shotKind: 'spear', shotSpeed: 255 },
+  infantry: { hp: 82, speed: 54, radius: 17, xp: 3, score: 28, damage: 16, color: '#7188a1', form: 'infantry', name: '中世纪步兵', skill: 'throw', skillEvery: 2.65, skillRange: 285, shotKind: 'spear', shotSpeed: 255, guardAfterShot: true },
   mutant: { hp: 76, speed: 43, radius: 19, xp: 4, score: 36, damage: 15, color: '#d16e48', form: 'mutant', name: '熔岩蜥', skill: 'dash', skillEvery: 3.7, skillRange: 265 },
   reclaimer: { hp: 42, speed: 82, radius: 13, xp: 2, score: 18, damage: 12, color: '#ab7058', form: 'reclaimer', name: '灰烬猎犬', skill: 'fan', skillEvery: 3.2, skillRange: 285, shotKind: 'ash', shotSpeed: 190, shots: 5, shotSpread: .22 },
   wisp: { hp: 28, speed: 86, radius: 11, xp: 3, score: 25, damage: 11, color: '#ed8a4e', form: 'wisp', name: '熔灰飞灵', skill: 'fire', skillEvery: 2.8, skillRange: 310, shotKind: 'fire', shotSpeed: 205, canFly: true },
@@ -264,6 +300,14 @@ const EFFECT_ART = {
   hurricane: { source: './assets/hurricane.png?v=20260827-14', size: 46 },
 };
 
+// Only the current stage is required before play.  The following stage begins
+// loading during the current one, so its art is already decoded before it can appear.
+const STAGE_EFFECTS = [
+  ['fan', 'hurricane', 'bubble'],
+  ['leaf', 'venom'],
+  ['flame'],
+];
+
 const HURRICANE_SPEED = 580;
 const HURRICANE_KNOCKBACK = 42;
 
@@ -309,6 +353,10 @@ const PICKUPS = {
   haste: { color: '#a8de66', glow: '#ddffad' },
   ward: { color: '#95a8ed', glow: '#d1dcff' },
   vampire: { color: '#d96f97', glow: '#ffb1c8' },
+  rage: { color: '#ec9966', glow: '#ffd2a1' },
+  shell: { color: '#93b7d8', glow: '#d7ebff' },
+  wind: { color: '#9dde83', glow: '#e0ffc5' },
+  echo: { color: '#c6a7ef', glow: '#e7d7ff' },
 };
 
 const ACTIVE_SKILLS = {
@@ -337,7 +385,8 @@ function makeRelicBuildings(terrain = 'shore') {
 
 function activeSkillCooldown(player, id) {
   const skill = ACTIVE_SKILLS[id];
-  return Math.max(skill.cooldown * .55, skill.cooldown - (player[`${id}Level`] || 0) * skill.cooldownStep);
+  const upgraded = Math.max(skill.cooldown * .55, skill.cooldown - (player[`${id}Level`] || 0) * skill.cooldownStep);
+  return upgraded * (1 - Math.min(.15, (player.echoRune || 0) * .03));
 }
 
 const XP_PER_GEM = 1;
@@ -486,18 +535,25 @@ class Game {
     this.musicSource = null;
     this.musicSourceGain = null;
     this.musicStage = -1;
+    this.initialAssetsReady = false;
+    this.stagePreloads = [];
     this.sprite = new Image();
     this.spriteReady = false;
-    this.sprite.addEventListener('load', () => { this.spriteReady = true; });
-    this.sprite.addEventListener('error', () => { console.warn('贴图加载失败：evolution-guide.png'); });
+    this.spritePromise = new Promise(resolve => {
+      this.sprite.addEventListener('load', () => { this.spriteReady = true; resolve(); }, { once: true });
+      this.sprite.addEventListener('error', () => { console.warn('贴图加载失败：evolution-guide.png'); resolve(); }, { once: true });
+    });
     this.sprite.src = './assets/evolution-guide.png?v=20260825-3';
     this.enemySprites = {};
     this.obstacleSprites = {};
     this.relicSprites = {};
     this.effectSprites = {};
-    this.loadBiomeSprites(0);
-    this.loadEffectSprite('fan');
-    this.loadEffectSprite('hurricane');
+    this.dom.difficultyButtons.forEach(button => { button.disabled = true; });
+    this.preloadStage(0).then(() => {
+      this.initialAssetsReady = true;
+      this.dom.assetStatus.textContent = '第一阶段贴图已就绪';
+      this.dom.difficultyButtons.forEach(button => { button.disabled = false; });
+    });
     this.resize();
     this.bindInput();
     window.addEventListener('resize', () => this.resize());
@@ -508,10 +564,13 @@ class Game {
     if (store[key] || !art) return store[key];
     const image = new Image();
     const sprite = { image, ready: false, failed: false, ...art };
-    image.addEventListener('load', () => { sprite.ready = true; });
-    image.addEventListener('error', () => {
-      sprite.failed = true;
-      console.warn(`贴图加载失败：${art.source}`);
+    sprite.promise = new Promise(resolve => {
+      image.addEventListener('load', () => { sprite.ready = true; resolve(sprite); }, { once: true });
+      image.addEventListener('error', () => {
+        sprite.failed = true;
+        console.warn(`贴图加载失败：${art.source}`);
+        resolve(sprite);
+      }, { once: true });
     });
     image.src = art.source;
     store[key] = sprite;
@@ -532,6 +591,23 @@ class Game {
     biome.enemies.forEach(kind => this.loadEnemySprite(kind));
     this.loadSprite(this.obstacleSprites, biome.terrain, OBSTACLE_ART[biome.terrain]);
     this.loadSprite(this.relicSprites, biome.terrain, RELIC_ART[biome.terrain]);
+  }
+
+  preloadStage(index) {
+    if (this.stagePreloads[index]) return this.stagePreloads[index];
+    const biome = BIOMES[index];
+    if (!biome) return Promise.resolve();
+    const sprites = [
+      ...biome.enemies.map(kind => this.loadEnemySprite(kind)),
+      this.loadEnemySprite(biome.boss),
+      this.loadSprite(this.obstacleSprites, biome.terrain, OBSTACLE_ART[biome.terrain]),
+      this.loadSprite(this.relicSprites, biome.terrain, RELIC_ART[biome.terrain]),
+      ...STAGE_EFFECTS[index].map(kind => this.loadEffectSprite(kind)),
+    ];
+    if (index === 0) sprites.push({ promise: this.spritePromise });
+    const preload = Promise.all(sprites.filter(Boolean).map(sprite => sprite.promise || Promise.resolve(sprite))).then(() => index);
+    this.stagePreloads[index] = preload;
+    return preload;
   }
 
   startMusic() {
@@ -633,11 +709,11 @@ class Game {
     this.shake = 0;
     this.pickupNotice = null;
     this.player = {
-      x: 0, y: 0, r: 17, hp: 100, maxHp: 100, speed: 170, facing: 4,
+      x: 0, y: 0, r: 14, hp: 100, maxHp: 100, speed: 170, facing: 4,
       fireEvery: .43, fireTimer: .15, damage: 18, projectiles: 1, pierce: 0, magnet: 86,
       spikeEvery: 2.18, spikeTimer: .8, spikeCount: 3, spikeDamage: 16,
       growthStage: 0, orbitCount: 1, orbitDamage: 14, orbitEvery: .36, orbitTimer: .16,
-      vampireLevel: 0,
+      vampireLevel: 0, vampireTimer: 0, rageRune: 0, shellRune: 0, windRune: 0, echoRune: 0,
       chainLevel: 0, chainEvery: 2.45, chainTimer: .4, chainDamage: 25,
       wheelLevel: 0, wheelEvery: 2.8, wheelTimer: .6, wheelDamage: 24,
       invuln: 0, hitInvuln: this.difficulty.hitInvuln, nova: 0, novaMax: 9, flash: 0, hitPulse: 0, slow: 0, haste: 0,
@@ -658,7 +734,10 @@ class Game {
   }
 
   start(difficultyId) {
+    if (!this.initialAssetsReady) return;
     this.reset(difficultyId);
+    void this.preloadStage(1);
+    if (screen.orientation?.lock) void screen.orientation.lock('landscape').catch(() => {});
     this.startMusic();
     this.dom.start.hidden = true;
     this.dom.end.hidden = true;
@@ -712,7 +791,7 @@ class Game {
     return {
       ...stats, ...position, kind, boss, hit: 0, attack: 0,
       skillTimer: .5 + Math.random() * stats.skillEvery,
-      dash: 0, dashAngle: 0, windup: 0, shield: 0, phase: Math.random() * TAU, facing: 4, flipX: false, phaseTwo: false,
+      dash: 0, dashAngle: 0, windup: 0, shield: 0, enraged: false, phase: Math.random() * TAU, facing: 4, flipX: false, phaseTwo: false,
     };
   }
 
@@ -842,6 +921,7 @@ class Game {
     p.nova = Math.max(0, p.nova - dt);
     p.slow = Math.max(0, p.slow - dt);
     p.haste = Math.max(0, p.haste - dt);
+    p.vampireTimer = Math.max(0, p.vampireTimer - dt);
     p.dashCooldown = Math.max(0, p.dashCooldown - dt);
     p.dashTime = Math.max(0, p.dashTime - dt);
     p.spearCooldown = Math.max(0, p.spearCooldown - dt);
@@ -924,7 +1004,7 @@ class Game {
     }
     const length = Math.hypot(dx, dy);
     if (length > (this.joystick ? .08 : .5)) {
-      const speed = p.speed * (p.slow > 0 ? .65 : 1) * (p.haste > 0 ? 1.3 : 1);
+      const speed = p.speed * (p.slow > 0 ? .65 : 1) * (p.haste > 0 ? 1.3 : 1) * (1 + p.windRune * .03);
       const pace = this.joystick ? speed * dt * Math.min(1, length) : Math.min(speed * dt, this.pointer ? length : speed * dt);
       this.moveAgainstTerrain(p, dx / length * pace, dy / length * pace, p.r);
       p.facing = directionFrame(dx, dy);
@@ -1090,9 +1170,11 @@ class Game {
   }
 
   damageEnemy(enemy, amount) {
-    const damage = enemy.shield > 0 ? Math.max(1, Math.round(amount * .52)) : amount;
+    const boostedAmount = Math.round(amount * (1 + this.player.rageRune * .03));
+    const damage = enemy.shield > 0 ? Math.max(1, Math.round(boostedAmount * .52)) : boostedAmount;
     enemy.hp -= damage;
-    const vampireHealed = applyVampireHeal(this.player, this.player.vampireLevel);
+    const vampireHealed = this.player.vampireTimer <= 0 ? applyVampireHeal(this.player, this.player.vampireLevel) : 0;
+    if (vampireHealed > 0) this.player.vampireTimer = .25;
     if (vampireHealed > 0) this.particles.push({ x: this.player.x, y: this.player.y - 22, vx: 0, vy: -18, life: .22, max: .22, color: '#f09ab3', size: 2.5 });
     enemy.hit = .15;
     this.particles.push(...Array.from({ length: enemy.boss ? 6 : 3 }, () => ({ x: enemy.x, y: enemy.y, vx: (Math.random() - .5) * 150, vy: (Math.random() - .5) * 150, life: .28, max: .28, color: enemy.shield > 0 ? '#d8eaa2' : enemy.color, size: 2 + Math.random() * 2 })));
@@ -1147,7 +1229,9 @@ class Game {
   hurtPlayer(amount, slow = 0) {
     const p = this.player;
     if (this.state !== 'playing' || p.invuln > 0) return false;
-    p.hp -= Math.max(1, Math.round(amount * (p.ward > 0 ? Math.max(.24, .42 - p.wardLevel * .018) : 1)));
+    const wardMultiplier = p.ward > 0 ? Math.max(.24, .42 - p.wardLevel * .018) : 1;
+    const armorMultiplier = 1 - Math.min(.125, p.shellRune * .025);
+    p.hp -= Math.max(1, Math.round(amount * wardMultiplier * armorMultiplier));
     p.invuln = p.hitInvuln;
     p.flash = 1;
     p.hitPulse = 1;
@@ -1175,6 +1259,8 @@ class Game {
       this.stageTime = 0;
       this.biomeIndex = nextBiome;
       this.loadBiomeSprites(this.biomeIndex);
+      void this.preloadStage(this.biomeIndex);
+      void this.preloadStage(this.biomeIndex + 1);
       this.biomeNotice = 3.4;
       this.spawnTimer = .7 / this.difficulty.spawnRate;
       this.enemyBullets = [];
@@ -1187,11 +1273,12 @@ class Game {
     const drops = Math.max(1, Math.ceil(enemy.xp / 2));
     for (let i = 0; i < drops; i += 1) this.gems.push({ x: enemy.x + (Math.random() - .5) * 12, y: enemy.y + (Math.random() - .5) * 12, r: 5, value: XP_PER_GEM, t: Math.random() * 3 });
     if (this.kills % this.difficulty.pickupEvery === 0) {
-      const kinds = Object.keys(PICKUPS);
-      const kind = kinds.filter(kindName => kindName !== 'vampire')[pickupIndex(this.kills, this.difficulty.pickupEvery, kinds.length - 1)];
+      const kinds = Object.keys(PICKUPS).filter(kindName => !RUNE_KINDS.includes(kindName));
+      const kind = kinds[pickupIndex(this.kills, this.difficulty.pickupEvery, kinds.length)];
       this.pickups.push({ kind, x: enemy.x, y: enemy.y, r: 10, t: 0 });
     }
-    if (Math.random() < VAMPIRE_RUNE_CHANCE) this.pickups.push({ kind: 'vampire', x: enemy.x + (Math.random() - .5) * 18, y: enemy.y + (Math.random() - .5) * 18, r: 11, t: 0 });
+    const rune = rollRune(this.player);
+    if (rune) this.pickups.push({ kind: rune, x: enemy.x + (Math.random() - .5) * 18, y: enemy.y + (Math.random() - .5) * 18, r: 11, t: 0 });
   }
 
   fireEnemyShots(enemy, dx, dy) {
@@ -1209,6 +1296,10 @@ class Game {
         r: enemy.shotKind === 'fire' ? 7 : 5, damage: enemy.damage * (enemy.shotKind === 'fire' ? .82 : .68), slow: style.slow, life: 2.35,
         bossArt: bossArt?.id || null, bossSprite: bossArt?.sprite || null,
       });
+    }
+    if (enemy.guardAfterShot) {
+      enemy.shield = Math.max(enemy.shield, .65);
+      this.rings.push({ x: enemy.x, y: enemy.y, radius: enemy.radius, max: enemy.radius * 1.55, life: .24, color: '#b9d4eb' });
     }
     this.particles.push({ x: enemy.x, y: enemy.y, vx: 0, vy: 0, life: .18, max: .18, color: style.color, size: 5 });
   }
@@ -1300,6 +1391,12 @@ class Game {
       e.dash = Math.max(0, e.dash - dt);
       e.windup = Math.max(0, e.windup - dt);
       e.shield = Math.max(0, e.shield - dt);
+      if (e.enrages && !e.enraged && e.hp <= e.maxHp * .4) {
+        e.enraged = true;
+        e.speed *= 1.18;
+        e.skillTimer = Math.min(e.skillTimer, .35);
+        this.rings.push({ x: e.x, y: e.y, radius: e.radius, max: e.radius * 2.1, life: .34, color: '#ffb56b' });
+      }
       if (e.boss && !e.phaseTwo && e.hp <= e.maxHp * .5) {
         e.phaseTwo = true;
         e.skillEvery = 3;
@@ -1766,6 +1863,27 @@ class Game {
         ctx.rotate(Math.sin(item.t) * .12);
         ctx.beginPath(); ctx.moveTo(0, item.r * .82); ctx.lineTo(-item.r * .78, -item.r * .1); ctx.arc(-item.r * .38, -item.r * .18, item.r * .4, Math.PI, 0); ctx.arc(item.r * .38, -item.r * .18, item.r * .4, Math.PI, 0); ctx.closePath(); ctx.fill();
         ctx.fillStyle = '#ffe1eb'; ctx.beginPath(); ctx.arc(0, item.r * .1, item.r * .18, 0, TAU); ctx.fill();
+      } else if (item.kind === 'rage') {
+        ctx.rotate(Math.sin(item.t) * .12);
+        ctx.beginPath(); ctx.moveTo(0, -item.r); ctx.lineTo(item.r * .68, item.r * .72); ctx.lineTo(0, item.r * .35); ctx.lineTo(-item.r * .68, item.r * .72); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#fff0bc'; ctx.beginPath(); ctx.arc(0, item.r * .15, item.r * .23, 0, TAU); ctx.fill();
+      } else if (item.kind === 'shell') {
+        ctx.rotate(Math.PI / 6 + Math.sin(item.t) * .1);
+        ctx.beginPath();
+        for (let index = 0; index < 6; index += 1) {
+          const angle = index / 6 * TAU;
+          index ? ctx.lineTo(Math.cos(angle) * item.r, Math.sin(angle) * item.r) : ctx.moveTo(Math.cos(angle) * item.r, Math.sin(angle) * item.r);
+        }
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#e7f5ff'; ctx.lineWidth = 1.5; ctx.stroke();
+      } else if (item.kind === 'wind') {
+        ctx.lineWidth = 3; ctx.strokeStyle = style.color;
+        ctx.beginPath(); ctx.arc(0, 0, item.r * .72, .35, TAU - .72); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, item.r * .38, .7, TAU); ctx.stroke();
+      } else if (item.kind === 'echo') {
+        ctx.rotate(Math.PI / 4 + Math.sin(item.t) * .12);
+        ctx.fillRect(-item.r * .58, -item.r * .58, item.r * 1.16, item.r * 1.16);
+        ctx.fillStyle = '#f5ebff'; ctx.fillRect(-item.r * .18, -item.r * .18, item.r * .36, item.r * .36);
       } else {
         ctx.rotate(Math.sin(item.t) * .14);
         ctx.fillRect(-item.r * .7, -3, item.r * 1.4, 6);
@@ -2019,10 +2137,10 @@ class Game {
     }
     ctx.globalAlpha = p.invuln > 0 ? .55 + Math.sin(this.time * 22) * .3 : 1;
     ctx.fillStyle = 'rgba(11, 30, 25, .42)';
-    ctx.beginPath(); ctx.ellipse(0, 29, 24, 7, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, p.r * 1.8, p.r * 1.35, p.r * .42, 0, 0, TAU); ctx.fill();
     if (this.spriteReady) {
       const frame = SPRITE_FRAMES[p.facing];
-      const scale = .35;
+      const scale = .25;
       const width = frame.w * scale;
       const height = frame.h * scale;
       ctx.imageSmoothingEnabled = false;
@@ -2108,11 +2226,18 @@ class Game {
       p.haste > 0 && `疾行 ${Math.ceil(p.haste)}s`,
       p.invuln > 1 && `护符 ${Math.ceil(p.invuln)}s`,
       p.ward > 0 && `护壁 ${Math.ceil(p.ward)}s`,
-      p.vampireLevel > 0 && `吸血 ×${p.vampireLevel}`,
     ].filter(Boolean).join(' · ');
+    const runes = [
+      p.vampireLevel > 0 && `血 ${p.vampireLevel}`,
+      p.rageRune > 0 && `战 ${p.rageRune}`,
+      p.shellRune > 0 && `甲 ${p.shellRune}`,
+      p.windRune > 0 && `风 ${p.windRune}`,
+      p.echoRune > 0 && `响 ${p.echoRune}`,
+    ].filter(Boolean).join(' · ');
+    const statusLines = [buffs, runes].filter(Boolean);
     ctx.save();
     ctx.fillStyle = 'rgba(9, 24, 20, .64)';
-    ctx.fillRect(12, 12, Math.min(258, this.width - 24), buffs ? 78 : 62);
+    ctx.fillRect(12, 12, Math.min(258, this.width - 24), 62 + statusLines.length * 14);
     ctx.fillStyle = '#eff5dc';
     ctx.font = '700 13px system-ui';
     ctx.fillText(`${biome.name} · ${this.difficulty.short} · Lv.${this.level}`, 20, 33);
@@ -2121,11 +2246,11 @@ class Game {
     ctx.fillStyle = growthForm(p.growthStage).color;
     ctx.font = '700 11px system-ui';
     ctx.fillText(growthForm(p.growthStage).name, 210, 61);
-    if (buffs) {
+    statusLines.forEach((line, index) => {
       ctx.fillStyle = '#aee6d0';
       ctx.font = '700 10px system-ui';
-      ctx.fillText(buffs, 20, 76);
-    }
+      ctx.fillText(line, 20, 76 + index * 13);
+    });
     const activeBoss = bossBarVisible(this.boss);
     const objective = activeBoss ? this.boss.name : `火种迁徙 ${Math.max(0, Math.ceil(BOSS_TIME - this.stageTime))}s`;
     ctx.textAlign = 'right';
@@ -2228,6 +2353,7 @@ function boot() {
     end: document.querySelector('#end-screen'),
     restartButton: document.querySelector('#restart-button'),
     difficultyButtons: [...document.querySelectorAll('[data-difficulty]')],
+    assetStatus: document.querySelector('#asset-status'),
     choices: document.querySelector('#choice-list'),
     endKicker: document.querySelector('#end-kicker'),
     endTitle: document.querySelector('#end-title'),
@@ -2254,7 +2380,7 @@ function boot() {
 }
 
 if (typeof document === 'undefined') {
-globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss };
+globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss };
 } else {
   boot();
 }
