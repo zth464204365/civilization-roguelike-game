@@ -32,6 +32,22 @@ function formatRuneNumber(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+function wrapCanvasText(ctx, text, maxWidth) {
+  const lines = [];
+  let line = '';
+  for (const character of [...String(text)]) {
+    const next = line + character;
+    if (line && ctx.measureText(next).width > maxWidth) {
+      lines.push(line);
+      line = character;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
 function joystickVector(offsetX, offsetY, max = JOYSTICK_MAX) {
   const distance = Math.hypot(offsetX, offsetY);
   if (!distance || max <= 0) return { x: 0, y: 0 };
@@ -257,15 +273,15 @@ const SPRITE_FRAMES = [
 ];
 
 const OBSTACLE_ART = {
-  shore: { source: './assets/shore-reef.png?v=20260825-7', height: 2.35, floor: .56 },
-  forest: { source: './assets/forest-tree.png?v=20260825-7', height: 3.25, floor: .78 },
-  volcano: { source: './assets/volcano-spire.png?v=20260825-7', height: 3.5, floor: .72 },
+  shore: { source: './assets/shore-reef.webp?v=20260825-7', height: 2.35, floor: .56 },
+  forest: { source: './assets/forest-tree.webp?v=20260825-7', height: 3.25, floor: .78 },
+  volcano: { source: './assets/volcano-spire.webp?v=20260825-7', height: 3.5, floor: .72 },
 };
 
 const RELIC_ART = {
-  shore: { source: './assets/relic-tide-ruin.png?v=20260828-1', size: 106 },
-  forest: { source: './assets/relic-forest-ruin.png?v=20260828-1', size: 110 },
-  volcano: { source: './assets/relic-volcano-ruin.png?v=20260828-1', size: 108 },
+  shore: { source: './assets/relic-tide-ruin.webp?v=20260828-1', size: 106 },
+  forest: { source: './assets/relic-forest-ruin.webp?v=20260828-1', size: 110 },
+  volcano: { source: './assets/relic-volcano-ruin.webp?v=20260828-1', size: 108 },
 };
 
 const ENEMY_SPRITE_FRAMES = {
@@ -274,30 +290,30 @@ const ENEMY_SPRITE_FRAMES = {
 };
 
 const ENEMY_ART = {
-  amoeba: { source: './assets/enemy-tide-snail.png?v=20260827-1', frame: [154, 246, 926, 727], scale: .041, size: .95 },
-  leech: { source: './assets/enemy-grit-worm.png?v=20260827-1', frame: [109, 275, 1035, 690], scale: .029, size: .88 },
-  crab: { source: './assets/enemy-reef-crab.png?v=20260827-1', frame: [74, 217, 1110, 805], scale: .041, size: 1.12 },
-  savage: { source: './assets/savage.png?v=20260825-6', frames: ENEMY_SPRITE_FRAMES.savage, scale: .20, size: 1.04 },
-  beetle: { source: './assets/enemy-moss-beetle.png?v=20260827-1', frame: [99, 53, 1049, 1113], scale: .042, size: 1.1 },
-  moth: { source: './assets/enemy-leaf-moth.png?v=20260827-1', frame: [90, 78, 1050, 1074], scale: .034, size: .98 },
-  thorn: { source: './assets/enemy-root-pod.png?v=20260827-1', frame: [113, 39, 1029, 1161], scale: .042, size: 1.05 },
-  infantry: { source: './assets/infantry.png?v=20260825-6', frames: ENEMY_SPRITE_FRAMES.infantry, scale: .20, size: 1.1 },
-  mutant: { source: './assets/enemy-lava-lizard.png?v=20260827-1', frame: [32, 383, 1181, 510], scale: .050, size: 1.14 },
-  reclaimer: { source: './assets/enemy-ash-hound.png?v=20260827-1', frame: [43, 235, 1186, 786], scale: .044, size: 1.04 },
-  wisp: { source: './assets/enemy-ash-wisp.png?v=20260827-1', frame: [141, 141, 959, 965], scale: .041, size: 1.02 },
-  tideBoss: { source: './assets/boss-tide-crab.png?v=20260828-1', frame: [0, 0, 1254, 1254], scale: .070, size: 1.1 },
-  groveBoss: { source: './assets/boss-ancient-warden.png?v=20260828-1', frame: [0, 0, 1254, 1254], scale: .072, size: 1.1 },
-  reversionBoss: { source: './assets/enemy-flame-ape.png?v=20260827-1', frame: [23, 22, 1185, 1170], scale: .077, size: 1.15 },
+  amoeba: { source: './assets/enemy-tide-snail.webp?v=20260827-1', frame: [154, 246, 926, 727], scale: .041, size: .95 },
+  leech: { source: './assets/enemy-grit-worm.webp?v=20260827-1', frame: [109, 275, 1035, 690], scale: .029, size: .88 },
+  crab: { source: './assets/enemy-reef-crab.webp?v=20260827-1', frame: [74, 217, 1110, 805], scale: .041, size: 1.12 },
+  savage: { source: './assets/savage.webp?v=20260825-6', frames: ENEMY_SPRITE_FRAMES.savage, scale: .20, size: 1.04 },
+  beetle: { source: './assets/enemy-moss-beetle.webp?v=20260827-1', frame: [99, 53, 1049, 1113], scale: .042, size: 1.1 },
+  moth: { source: './assets/enemy-leaf-moth.webp?v=20260827-1', frame: [90, 78, 1050, 1074], scale: .034, size: .98 },
+  thorn: { source: './assets/enemy-root-pod.webp?v=20260827-1', frame: [113, 39, 1029, 1161], scale: .042, size: 1.05 },
+  infantry: { source: './assets/infantry.webp?v=20260825-6', frames: ENEMY_SPRITE_FRAMES.infantry, scale: .20, size: 1.1 },
+  mutant: { source: './assets/enemy-lava-lizard.webp?v=20260827-1', frame: [32, 383, 1181, 510], scale: .050, size: 1.14 },
+  reclaimer: { source: './assets/enemy-ash-hound.webp?v=20260827-1', frame: [43, 235, 1186, 786], scale: .044, size: 1.04 },
+  wisp: { source: './assets/enemy-ash-wisp.webp?v=20260827-1', frame: [141, 141, 959, 965], scale: .041, size: 1.02 },
+  tideBoss: { source: './assets/boss-tide-crab.webp?v=20260828-1', frame: [0, 0, 1254, 1254], scale: .070, size: 1.1 },
+  groveBoss: { source: './assets/boss-ancient-warden.webp?v=20260828-1', frame: [0, 0, 1254, 1254], scale: .072, size: 1.1 },
+  reversionBoss: { source: './assets/enemy-flame-ape.webp?v=20260827-1', frame: [23, 22, 1185, 1170], scale: .077, size: 1.15 },
 };
 
 const FAN_HANDLE_ANGLE = 1.92;
 const EFFECT_ART = {
-  fan: { source: './assets/fan.png?v=20260827-14', size: 54 },
-  flame: { source: './assets/flame.png?v=20260827-14', size: 28 },
-  bubble: { source: './assets/boss-bubble.png?v=20260828-1', size: 32 },
-  leaf: { source: './assets/boss-leaf.png?v=20260828-1', size: 34 },
-  venom: { source: './assets/venom.png?v=20260827-14', width: 58, height: 42 },
-  hurricane: { source: './assets/hurricane.png?v=20260827-14', size: 46 },
+  fan: { source: './assets/fan.webp?v=20260827-14', size: 54 },
+  flame: { source: './assets/flame.webp?v=20260827-14', size: 28 },
+  bubble: { source: './assets/boss-bubble.webp?v=20260828-1', size: 32 },
+  leaf: { source: './assets/boss-leaf.webp?v=20260828-1', size: 34 },
+  venom: { source: './assets/venom.webp?v=20260827-14', width: 58, height: 42 },
+  hurricane: { source: './assets/hurricane.webp?v=20260827-14', size: 46 },
 };
 
 // Only the current stage is required before play.  The following stage begins
@@ -560,9 +576,9 @@ class Game {
     this.spriteReady = false;
     this.spritePromise = new Promise(resolve => {
       this.sprite.addEventListener('load', () => { this.spriteReady = true; resolve(); }, { once: true });
-      this.sprite.addEventListener('error', () => { console.warn('贴图加载失败：evolution-guide.png'); resolve(); }, { once: true });
+      this.sprite.addEventListener('error', () => { console.warn('贴图加载失败：evolution-guide.webp'); resolve(); }, { once: true });
     });
-    this.sprite.src = './assets/evolution-guide.png?v=20260825-3';
+    this.sprite.src = './assets/evolution-guide.webp?v=20260825-3';
     this.enemySprites = {};
     this.obstacleSprites = {};
     this.relicSprites = {};
@@ -2356,7 +2372,10 @@ class Game {
     ctx.textAlign = 'center';
     ctx.font = '800 14px system-ui';
     ctx.fillStyle = notice.color;
-    ctx.fillText(notice.text, this.width / 2, this.height * .72);
+    const lines = wrapCanvasText(ctx, notice.text, Math.min(560, Math.max(120, this.width - 28)));
+    const lineHeight = 18;
+    const startY = this.height * .72 - (lines.length - 1) * lineHeight / 2;
+    lines.forEach((line, index) => ctx.fillText(line, this.width / 2, startY + index * lineHeight));
     ctx.restore();
   }
 
@@ -2413,7 +2432,7 @@ function boot() {
 }
 
 if (typeof document === 'undefined') {
-globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss };
+globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss, wrapCanvasText };
 } else {
   boot();
 }
