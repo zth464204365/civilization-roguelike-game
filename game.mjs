@@ -567,11 +567,9 @@ class Game {
     this.obstacleSprites = {};
     this.relicSprites = {};
     this.effectSprites = {};
-    this.dom.difficultyButtons.forEach(button => { button.disabled = true; });
     this.preloadStage(0).then(() => {
       this.initialAssetsReady = true;
-      this.dom.assetStatus.textContent = '第一阶段贴图已就绪';
-      this.dom.difficultyButtons.forEach(button => { button.disabled = false; });
+      this.dom.assetStatus.textContent = '第一阶段贴图已在后台就绪';
     });
     this.resize();
     this.bindInput();
@@ -753,7 +751,6 @@ class Game {
   }
 
   start(difficultyId) {
-    if (!this.initialAssetsReady) return;
     this.enterLandscape();
     this.reset(difficultyId);
     void this.preloadStage(1);

@@ -19,8 +19,12 @@ assert.ok(Math.abs(Math.hypot(diagonalJoystick.x, diagonalJoystick.y) - 1) < 0.0
 assert.equal(gameSource.includes('setPointerCapture'), false);
 assert.ok(gameSource.includes('this.preloadStage(0)'));
 assert.ok(gameSource.includes('void this.preloadStage(1)'));
+assert.equal(gameSource.includes('if (!this.initialAssetsReady) return;'), false);
 assert.ok(gameSource.includes('requestFullscreen'));
 assert.equal(indexSource.includes('id="rotate-screen"'), false);
+assert.ok(indexSource.includes('rel="preload" as="image"'));
+assert.ok(indexSource.includes('boss-tide-crab.png?v=20260828-1'));
+assert.equal(indexSource.includes('data-difficulty="normal" disabled'), false);
 assert.ok(gameSource.includes('Math.ceil(p.hp)'));
 assert.equal(gameSource.includes('for (const [kind, art] of Object.entries(ENEMY_ART))'), false);
 assert.deepEqual(Array.from(chooseUnique(['a', 'b', 'c'], 3, () => 0)), ['a', 'b', 'c']);
