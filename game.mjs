@@ -16,12 +16,17 @@ function runeLevel(player, kind) {
   return config ? Math.max(0, Math.floor(player?.[config.key] || 0)) : 0;
 }
 
+function runeMaxFor(player, kind) {
+  const config = RUNE_CONFIG[kind];
+  return config ? config.max + Math.max(0, Math.floor(player?.runeCapBonus || 0)) : 0;
+}
+
 function rollRune(player = {}, random = Math.random) {
   let threshold = 0;
   const roll = random();
   for (const kind of RUNE_KINDS) {
     const config = RUNE_CONFIG[kind];
-    if (runeLevel(player, kind) >= config.max) continue;
+    if (runeLevel(player, kind) >= runeMaxFor(player, kind)) continue;
     threshold += config.chance;
     if (roll < threshold) return kind;
   }
@@ -115,7 +120,7 @@ function applyPickup(player, kind) {
   }
   if (RUNE_CONFIG[kind]) {
     const config = RUNE_CONFIG[kind];
-    const level = Math.min(config.max, runeLevel(player, kind) + 1);
+    const level = Math.min(runeMaxFor(player, kind), runeLevel(player, kind) + 1);
     player[config.key] = level;
     if (kind === 'vampire') return { text: `吸血符文 +1 · 命中回复 ${formatRuneNumber(level * VAMPIRE_HEAL_PER_HIT)} 点`, color: config.color };
     if (kind === 'rage') return { text: `战意符文 +1 · 全部伤害 +${level * 3}%`, color: config.color };
@@ -155,8 +160,16 @@ function difficultyFor(id) {
   return DIFFICULTIES[id] || DIFFICULTIES.normal;
 }
 
-function spawnInterval(time, difficulty) {
-  return Math.max(.16, .68 - time * .0042) / difficulty.spawnRate;
+function spawnInterval(time, difficulty, endlessCycle = 0) {
+  return Math.max(.12, .68 - time * .0042) / (difficulty.spawnRate * (1 + Math.max(0, endlessCycle) * .14));
+}
+
+function bossSpawnInterval(difficulty, endlessCycle = 0) {
+  return .7 / (difficulty.spawnRate * (1 + Math.max(0, endlessCycle) * .14));
+}
+
+function endlessSpawnCount(cycle) {
+  return 1 + Math.min(3, Math.floor(Math.max(0, Number(cycle) || 0) / 2));
 }
 
 function pickupIndex(kills, pickupEvery, kinds) {
@@ -352,8 +365,26 @@ function endlessMultiplier(cycle) {
   return 1 + Math.max(0, Math.floor(Number(cycle) || 0)) * .18;
 }
 
+function tuneBossStats(stats, cycle = 0) {
+  const rank = Math.max(0, Math.floor(Number(cycle) || 0));
+  const tuned = {
+    ...stats,
+    speed: stats.speed * (1.18 + rank * .06),
+    skillEvery: Math.max(1.45, stats.skillEvery * (1 - rank * .1)),
+    shots: (stats.shots || 1) + Math.min(6, Math.floor(rank / 2)),
+    shotSpeed: stats.shotSpeed ? stats.shotSpeed * (1 + rank * .08) : stats.shotSpeed,
+  };
+  if (Number.isFinite(stats.skillRange)) tuned.skillRange = stats.skillRange * (1 + rank * .12);
+  if (Number.isFinite(stats.skillRadius)) tuned.skillRadius = stats.skillRadius * (1 + rank * .12);
+  return tuned;
+}
+
 function hitFeedbackAlpha(flash) {
   return clamp(Number(flash) || 0, 0, 1) * .28;
+}
+
+function nextExperienceTarget(current) {
+  return Math.ceil(Math.max(1, Number(current) || 1) * 1.28 + 1);
 }
 
 function orbitFanAngle(orbitAngle) {
@@ -409,6 +440,10 @@ const RELIC_BUILDING_SITES = [
 const ACTIVE_SKILL_MAX_LEVEL = 15;
 const RELIC_RESPAWN_INTERVAL = 7;
 const RELIC_MAX_ACTIVE = 9;
+
+function skillMaxLevel(player) {
+  return ACTIVE_SKILL_MAX_LEVEL + Math.max(0, Math.floor(player?.skillCapBonus || 0));
+}
 
 function makeRelicBuilding(site, x = site.x, y = site.y, terrain = 'shore') {
   return { ...site, x, y, terrain, maxHp: site.hp, hit: 0, isBuilding: true };
@@ -744,6 +779,7 @@ class Game {
     this.spawnTimer = .7 / this.difficulty.spawnRate;
     this.bossSpawned = false;
     this.boss = null;
+    this.bossDefeated = 0;
     this.endless = false;
     this.endlessCycle = 0;
     this.biomeIndex = 0;
@@ -766,7 +802,7 @@ class Game {
       fireEvery: .43, fireTimer: .15, damage: 18, projectiles: 1, pierce: 0, magnet: 86,
       spikeEvery: 2.18, spikeTimer: .8, spikeCount: 3, spikeDamage: 16,
       growthStage: 0, orbitCount: 1, orbitDamage: 14, orbitEvery: .36, orbitTimer: .16,
-      vampireLevel: 0, vampireTimer: 0, rageRune: 0, shellRune: 0, windRune: 0, echoRune: 0,
+      vampireLevel: 0, vampireTimer: 0, rageRune: 0, shellRune: 0, windRune: 0, echoRune: 0, runeCapBonus: 0, skillCapBonus: 0,
       chainLevel: 0, chainEvery: 2.45, chainTimer: .4, chainDamage: 25,
       wheelLevel: 0, wheelEvery: 2.8, wheelTimer: .6, wheelDamage: 24,
       invuln: 0, hitInvuln: this.difficulty.hitInvuln, nova: 0, novaMax: 9, flash: 0, hitPulse: 0, slow: 0, haste: 0,
@@ -941,7 +977,7 @@ class Game {
     const biome = BIOMES[this.biomeIndex];
     const kind = biome.enemies[Math.floor(Math.random() * biome.enemies.length)];
     this.loadEnemySprite(kind);
-    const s = enemyStats(kind, difficulty * this.difficulty.hp * endless, this.difficulty.damage * (1 + this.time * .0015) * endless, this.difficulty.speed * (1 + this.time * .00055) * (1 + Math.max(0, this.endlessCycle) * .04));
+    const s = enemyStats(kind, difficulty * this.difficulty.hp * endless, this.difficulty.damage * (1 + this.time * .0015) * endless, this.difficulty.speed * (1 + this.time * .00055) * (1 + Math.max(0, this.endlessCycle) * .065));
     const margin = s.radius + 72;
     let p;
     for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -960,7 +996,8 @@ class Game {
     this.loadEnemySprite(kind);
     this.loadEffectSprite(BOSS_SHOT_ART[kind]?.sprite);
     const endless = endlessMultiplier(this.endlessCycle);
-    const s = enemyStats(kind, (1 + this.time * .0055) * this.difficulty.hp * endless, this.difficulty.damage * (1 + this.time * .0015) * endless, this.difficulty.speed * (1 + this.time * .00055) * (1 + Math.max(0, this.endlessCycle) * .04));
+    const s = tuneBossStats(enemyStats(kind, (1 + this.time * .0055) * this.difficulty.hp * endless, this.difficulty.damage * (1 + this.time * .0015) * endless, this.difficulty.speed * (1 + this.time * .00055) * (1 + Math.max(0, this.endlessCycle) * .065)), this.endlessCycle);
+    s.endlessCycle = this.endlessCycle;
     let x = this.player.x;
     const y = this.player.y - Math.max(this.width, this.height) * .7;
     for (let attempt = 0; attempt < 6 && hitsObstacle(x, y, s.radius + 4); attempt += 1) x += OBSTACLE_TILE * .45;
@@ -1024,15 +1061,15 @@ class Game {
     if (!this.bossSpawned) {
       this.spawnTimer -= dt;
       if (this.spawnTimer <= 0) {
-        this.spawnEnemy();
-        this.spawnTimer += spawnInterval(this.time, this.difficulty);
+        for (let count = 0; count < endlessSpawnCount(this.endlessCycle); count += 1) this.spawnEnemy();
+        this.spawnTimer += spawnInterval(this.time, this.difficulty, this.endlessCycle);
       }
       if (this.stageTime >= BOSS_TIME) this.spawnBoss();
     } else if (this.boss && this.boss.hp > 0) {
       this.spawnTimer -= dt;
       if (this.spawnTimer <= 0) {
-        this.spawnEnemy();
-        this.spawnTimer += .7 / this.difficulty.spawnRate;
+        for (let count = 0; count < endlessSpawnCount(this.endlessCycle); count += 1) this.spawnEnemy();
+        this.spawnTimer += bossSpawnInterval(this.difficulty, this.endlessCycle);
       }
     }
     this.updateBuildings(dt);
@@ -1256,7 +1293,7 @@ class Game {
   spawnRelicBuilding() {
     const levels = RELIC_BUILDING_SITES.map(site => this.player[`${site.skill}Level`] || 0);
     const lowestLevel = Math.min(...levels);
-    const sites = RELIC_BUILDING_SITES.filter(site => (this.player[`${site.skill}Level`] || 0) === lowestLevel && lowestLevel < ACTIVE_SKILL_MAX_LEVEL);
+    const sites = RELIC_BUILDING_SITES.filter(site => (this.player[`${site.skill}Level`] || 0) === lowestLevel && lowestLevel < skillMaxLevel(this.player));
     if (!sites.length) return;
     const site = sites[Math.floor(Math.random() * sites.length)];
     const minDistance = relicSpawnMinDistance(this.width, this.height);
@@ -1281,7 +1318,7 @@ class Game {
     if (building.hp > 0) return;
     building.dead = true;
     const levelKey = `${building.skill}Level`;
-    this.player[levelKey] = Math.min(ACTIVE_SKILL_MAX_LEVEL, this.player[levelKey] + 1);
+    this.player[levelKey] = Math.min(skillMaxLevel(this.player), this.player[levelKey] + 1);
     this.buildings = this.buildings.filter(candidate => candidate !== building);
     this.pickupNotice = { text: `${skill.label} 强化 · ${skill.upgrade}`, color: skill.color, life: 2.4 };
     this.rings.push({ x: building.x, y: building.y, radius: 8, max: 82, life: .48, color: skill.color });
@@ -1306,6 +1343,17 @@ class Game {
     return true;
   }
 
+  registerBossDefeat() {
+    this.bossDefeated += 1;
+    this.player.skillCapBonus += 2;
+    this.player.runeCapBonus += 1;
+    this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.maxHp * .35);
+    this.player.dashCooldown = 0;
+    this.player.spearCooldown = 0;
+    this.player.wardCooldown = 0;
+    this.pickupNotice = { text: `Boss奖励 · 技能上限 +2 · 符文上限 +1`, color: '#ffd06c', life: 2.8 };
+  }
+
   enterEndlessMode() {
     this.endless = true;
     this.endlessCycle += 1;
@@ -1316,12 +1364,12 @@ class Game {
     this.loadBiomeSprites(this.biomeIndex);
     void this.preloadStage(this.biomeIndex);
     this.biomeNotice = 3.8;
-    this.spawnTimer = .7 / this.difficulty.spawnRate;
+    this.spawnTimer = bossSpawnInterval(this.difficulty, this.endlessCycle);
     this.enemyBullets = [];
     this.buildings = makeRelicBuildings(BIOMES[this.biomeIndex].terrain, this.player);
     this.relicTimer = 4;
     this.setMusicStage(musicStageFor(this.biomeIndex));
-    this.pickupNotice = { text: `无尽模式 · 第 ${this.endlessCycle} 轮开始`, color: '#ffd06c', life: 2.8 };
+    this.pickupNotice = { text: `无尽模式 · 第 ${this.endlessCycle} 轮开始 · 上限已提升`, color: '#ffd06c', life: 2.8 };
     this.rings.push({ x: this.player.x, y: this.player.y, radius: 10, max: 210, life: .9, color: '#ffd06c' });
   }
 
@@ -1330,6 +1378,7 @@ class Game {
     this.score += enemyScore(enemy, this.difficulty);
     this.kills += 1;
     if (enemy.boss) {
+      this.registerBossDefeat();
       this.particles.push(...Array.from({ length: 45 }, () => ({ x: enemy.x, y: enemy.y, vx: (Math.random() - .5) * 360, vy: (Math.random() - .5) * 360, life: .65 + Math.random() * .4, max: 1, color: Math.random() > .5 ? '#ffd37a' : '#ff749a', size: 2 + Math.random() * 4 })));
       const nextBiome = nextBiomeAfterBoss(enemy.biomeIndex ?? this.biomeIndex);
       if (nextBiome === null) {
@@ -1481,7 +1530,7 @@ class Game {
       }
       if (e.boss && !e.phaseTwo && e.hp <= e.maxHp * .5) {
         e.phaseTwo = true;
-        e.skillEvery = 3;
+        e.skillEvery = Math.max(1.35, e.skillEvery * .78);
         e.skillTimer = Math.min(e.skillTimer, .55);
         this.setMusicStage(musicStageFor(this.biomeIndex, e));
         this.rings.push({ x: e.x, y: e.y, radius: e.radius, max: e.radius * 3.2, life: .75, color: '#ffbd68' });
@@ -1563,7 +1612,7 @@ class Game {
       this.xp -= this.nextXp;
       this.level += 1;
       growPlayerStatsOnLevel(this.player, this.level);
-      this.nextXp = Math.ceil(this.nextXp * 1.38 + 2);
+      this.nextXp = nextExperienceTarget(this.nextXp);
       this.levelUp();
     }
   }
@@ -2495,7 +2544,7 @@ function boot() {
 }
 
 if (typeof document === 'undefined') {
-globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, growPlayerStatsOnLevel, endlessMultiplier, hitFeedbackAlpha, relicSpawnMinDistance, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss, wrapCanvasText };
+globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, runeMaxFor, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, growPlayerStatsOnLevel, endlessMultiplier, tuneBossStats, hitFeedbackAlpha, relicSpawnMinDistance, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, skillMaxLevel, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, bossSpawnInterval, endlessSpawnCount, nextExperienceTarget, growthForm, stageClock, nextBiomeAfterBoss, wrapCanvasText };
 } else {
   boot();
 }

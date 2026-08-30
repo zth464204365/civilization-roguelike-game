@@ -7,7 +7,7 @@ vm.createContext(sandbox);
 const gameSource = readFileSync(new URL('./game.mjs', import.meta.url), 'utf8');
 const indexSource = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
 vm.runInContext(gameSource, sandbox);
-const { chooseUnique, clamp, joystickVector, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, growPlayerStatsOnLevel, endlessMultiplier, hitFeedbackAlpha, relicSpawnMinDistance, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss, wrapCanvasText } = sandbox.__civilizationTest;
+const { chooseUnique, clamp, joystickVector, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, runeMaxFor, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, growPlayerStatsOnLevel, endlessMultiplier, tuneBossStats, hitFeedbackAlpha, relicSpawnMinDistance, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, skillMaxLevel, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, bossSpawnInterval, endlessSpawnCount, nextExperienceTarget, growthForm, stageClock, nextBiomeAfterBoss, wrapCanvasText } = sandbox.__civilizationTest;
 
 assert.equal(clamp(12, 0, 10), 10);
 assert.equal(joystickVector(0, 0).x, 0);
@@ -23,6 +23,7 @@ assert.equal(gameSource.includes('if (!this.initialAssetsReady) return;'), false
 assert.ok(gameSource.includes("evolution-guide.webp"));
 assert.ok(gameSource.includes('enterEndlessMode'));
 assert.equal(gameSource.includes('this.finish(true)'), false);
+assert.ok(gameSource.includes('registerBossDefeat'));
 assert.ok(gameSource.includes('requestFullscreen'));
 assert.equal(indexSource.includes('id="rotate-screen"'), false);
 assert.ok(indexSource.includes('rel="preload" as="image"'));
@@ -99,6 +100,8 @@ assert.deepEqual({ x: makeRelicBuilding(RELIC_BUILDING_SITES[0], 12, 34).x, y: m
 assert.ok(RELIC_RESPAWN_INTERVAL <= 8 && RELIC_MAX_ACTIVE >= 9);
 assert.equal(ACTIVE_SKILL_MAX_LEVEL, 15);
 assert.deepEqual(Object.fromEntries(Object.entries(RUNE_CONFIG).map(([kind, config]) => [kind, config.max])), { vampire: 8, rage: 10, shell: 8, wind: 8, echo: 8 });
+assert.equal(skillMaxLevel({ skillCapBonus: 4 }), ACTIVE_SKILL_MAX_LEVEL + 4);
+assert.equal(runeMaxFor({ runeCapBonus: 3 }, 'vampire'), RUNE_CONFIG.vampire.max + 3);
 assert.ok(relicSpawnMinDistance(844, 390) > Math.hypot(844, 390) / 2);
 assert.ok(RELIC_BUILDING_SITES.every(site => Math.hypot(site.x, site.y) > relicSpawnMinDistance(1280, 720, 0)));
 const grownPlayer = { maxHp: 100, hp: 40, damage: 18, speed: 170 };
@@ -107,6 +110,13 @@ assert.ok(grownPlayer.maxHp > 100 && grownPlayer.damage > 18 && grownPlayer.spee
 assert.equal(hitFeedbackAlpha(1), .28);
 assert.equal(hitFeedbackAlpha(0), 0);
 assert.ok(endlessMultiplier(3) > endlessMultiplier(1));
+assert.equal(endlessSpawnCount(0), 1);
+assert.equal(endlessSpawnCount(4), 3);
+assert.ok(spawnInterval(20, difficultyFor('normal'), 2) < spawnInterval(20, difficultyFor('normal'), 0));
+assert.ok(bossSpawnInterval(difficultyFor('normal'), 2) < bossSpawnInterval(difficultyFor('normal'), 0));
+const tunedBoss = tuneBossStats({ speed: 40, skillEvery: 4, skillRange: 200, skillRadius: 100, shots: 5, shotSpeed: 180 }, 2);
+assert.ok(tunedBoss.speed > 40 && tunedBoss.skillEvery < 4 && tunedBoss.skillRange > 200 && tunedBoss.skillRadius > 100 && tunedBoss.shots > 5 && tunedBoss.shotSpeed > 180);
+assert.equal(nextExperienceTarget(7), 10);
 assert.equal(XP_PER_GEM, 1);
 assert.equal(VAMPIRE_HEAL_PER_HIT, .2);
 assert.equal(VAMPIRE_RUNE_CHANCE, .02);
