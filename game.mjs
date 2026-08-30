@@ -3,11 +3,11 @@ const JOYSTICK_MAX = 32;
 const VAMPIRE_HEAL_PER_HIT = .2;
 const VAMPIRE_RUNE_CHANCE = .02;
 const RUNE_CONFIG = {
-  vampire: { key: 'vampireLevel', name: '吸血符文', chance: VAMPIRE_RUNE_CHANCE, max: 5, color: '#d96f97' },
-  rage: { key: 'rageRune', name: '战意符文', chance: .009, max: 6, color: '#ec9966' },
-  shell: { key: 'shellRune', name: '岩甲符文', chance: .008, max: 5, color: '#93b7d8' },
-  wind: { key: 'windRune', name: '疾风符文', chance: .008, max: 5, color: '#9dde83' },
-  echo: { key: 'echoRune', name: '回响符文', chance: .006, max: 5, color: '#c6a7ef' },
+  vampire: { key: 'vampireLevel', name: '吸血符文', chance: VAMPIRE_RUNE_CHANCE, max: 8, color: '#d96f97' },
+  rage: { key: 'rageRune', name: '战意符文', chance: .009, max: 10, color: '#ec9966' },
+  shell: { key: 'shellRune', name: '岩甲符文', chance: .008, max: 8, color: '#93b7d8' },
+  wind: { key: 'windRune', name: '疾风符文', chance: .008, max: 8, color: '#9dde83' },
+  echo: { key: 'echoRune', name: '回响符文', chance: .006, max: 8, color: '#c6a7ef' },
 };
 const RUNE_KINDS = Object.keys(RUNE_CONFIG);
 
@@ -196,6 +196,10 @@ function cameraFromPlayer(player, width, height) {
   return { x: player.x - width / 2, y: player.y - height / 2 };
 }
 
+function relicSpawnMinDistance(width, height, margin = 96) {
+  return Math.hypot(width, height) / 2 + margin;
+}
+
 function directionFrame(dx, dy) {
   const horizontal = Math.sign(dx);
   const vertical = Math.sign(dy);
@@ -337,6 +341,21 @@ function healOnLevel(player) {
   player.hp = Math.min(player.maxHp, player.hp + player.maxHp * .5);
 }
 
+function growPlayerStatsOnLevel(player, level) {
+  const rank = Math.max(1, Math.floor(Number(level) || 1));
+  player.maxHp += 5 + Math.ceil(rank * .8);
+  player.damage += 1 + Math.floor(rank / 5);
+  player.speed *= 1.012;
+}
+
+function endlessMultiplier(cycle) {
+  return 1 + Math.max(0, Math.floor(Number(cycle) || 0)) * .18;
+}
+
+function hitFeedbackAlpha(flash) {
+  return clamp(Number(flash) || 0, 0, 1) * .28;
+}
+
 function orbitFanAngle(orbitAngle) {
   return orbitAngle + Math.PI - FAN_HANDLE_ANGLE;
 }
@@ -381,13 +400,13 @@ const ACTIVE_SKILLS = {
   ward: { label: '护壁', key: 'R', cooldown: 12, cooldownStep: .54, color: '#aebdff', upgrade: '持续、范围与减伤逐级增强，冷却 -0.54 秒' },
 };
 
-// Fixed relics seed the map; more copies appear as the open world expands.
+// Relative relic offsets keep the initial set outside the current camera; more copies appear as the open world expands.
 const RELIC_BUILDING_SITES = [
-  { x: 230, y: -170, hp: 110, r: 36, skill: 'dash', name: '风痕遗迹' },
-  { x: -300, y: 360, hp: 130, r: 38, skill: 'spear', name: '风暴祭坛' },
-  { x: 340, y: 760, hp: 150, r: 40, skill: 'ward', name: '祖灵石碑' },
+  { x: 760, y: -500, hp: 110, r: 36, skill: 'dash', name: '风痕遗迹' },
+  { x: -720, y: 560, hp: 130, r: 38, skill: 'spear', name: '风暴祭坛' },
+  { x: 560, y: 760, hp: 150, r: 40, skill: 'ward', name: '祖灵石碑' },
 ];
-const ACTIVE_SKILL_MAX_LEVEL = 10;
+const ACTIVE_SKILL_MAX_LEVEL = 15;
 const RELIC_RESPAWN_INTERVAL = 7;
 const RELIC_MAX_ACTIVE = 9;
 
@@ -395,8 +414,8 @@ function makeRelicBuilding(site, x = site.x, y = site.y, terrain = 'shore') {
   return { ...site, x, y, terrain, maxHp: site.hp, hit: 0, isBuilding: true };
 }
 
-function makeRelicBuildings(terrain = 'shore') {
-  return RELIC_BUILDING_SITES.map(site => makeRelicBuilding(site, site.x, site.y, terrain));
+function makeRelicBuildings(terrain = 'shore', origin = { x: 0, y: 0 }) {
+  return RELIC_BUILDING_SITES.map(site => makeRelicBuilding(site, origin.x + site.x, origin.y + site.y, terrain));
 }
 
 function activeSkillCooldown(player, id) {
@@ -725,6 +744,8 @@ class Game {
     this.spawnTimer = .7 / this.difficulty.spawnRate;
     this.bossSpawned = false;
     this.boss = null;
+    this.endless = false;
+    this.endlessCycle = 0;
     this.biomeIndex = 0;
     this.loadBiomeSprites(this.biomeIndex);
     this.stageTime = 0;
@@ -732,7 +753,6 @@ class Game {
     this.enemies = [];
     this.bullets = [];
     this.enemyBullets = [];
-    this.buildings = makeRelicBuildings(BIOMES[this.biomeIndex].terrain);
     this.relicTimer = 4;
     this.gems = [];
     this.pickups = [];
@@ -754,6 +774,7 @@ class Game {
       spearCooldown: 0, spearLevel: 0,
       wardCooldown: 0, ward: 0, wardLevel: 0,
     };
+    this.buildings = makeRelicBuildings(BIOMES[this.biomeIndex].terrain, this.player);
     this.updateCamera();
     this.dom.nova.hidden = false;
     this.dom.dash.hidden = false;
@@ -916,10 +937,11 @@ class Game {
     // ponytail: bound active enemies for mobile; raise the cap only after profiling a denser encounter.
     if (this.enemies.length >= 45) return;
     const difficulty = 1 + this.time * .0085;
+    const endless = endlessMultiplier(this.endlessCycle);
     const biome = BIOMES[this.biomeIndex];
     const kind = biome.enemies[Math.floor(Math.random() * biome.enemies.length)];
     this.loadEnemySprite(kind);
-    const s = enemyStats(kind, difficulty * this.difficulty.hp, this.difficulty.damage * (1 + this.time * .0015), this.difficulty.speed * (1 + this.time * .00055));
+    const s = enemyStats(kind, difficulty * this.difficulty.hp * endless, this.difficulty.damage * (1 + this.time * .0015) * endless, this.difficulty.speed * (1 + this.time * .00055) * (1 + Math.max(0, this.endlessCycle) * .04));
     const margin = s.radius + 72;
     let p;
     for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -937,7 +959,8 @@ class Game {
     const kind = BIOMES[this.biomeIndex].boss;
     this.loadEnemySprite(kind);
     this.loadEffectSprite(BOSS_SHOT_ART[kind]?.sprite);
-    const s = enemyStats(kind, (1 + this.time * .0055) * this.difficulty.hp, this.difficulty.damage * (1 + this.time * .0015), this.difficulty.speed * (1 + this.time * .00055));
+    const endless = endlessMultiplier(this.endlessCycle);
+    const s = enemyStats(kind, (1 + this.time * .0055) * this.difficulty.hp * endless, this.difficulty.damage * (1 + this.time * .0015) * endless, this.difficulty.speed * (1 + this.time * .00055) * (1 + Math.max(0, this.endlessCycle) * .04));
     let x = this.player.x;
     const y = this.player.y - Math.max(this.width, this.height) * .7;
     for (let attempt = 0; attempt < 6 && hitsObstacle(x, y, s.radius + 4); attempt += 1) x += OBSTACLE_TILE * .45;
@@ -956,8 +979,8 @@ class Game {
     const p = this.player;
     this.biomeNotice = Math.max(0, this.biomeNotice - dt);
     p.invuln = Math.max(0, p.invuln - dt);
-    p.flash = Math.max(0, p.flash - dt * 4);
-    p.hitPulse = Math.max(0, p.hitPulse - dt * 4.5);
+    p.flash = Math.max(0, p.flash - dt * 3.6);
+    p.hitPulse = Math.max(0, p.hitPulse - dt * 3.8);
     p.nova = Math.max(0, p.nova - dt);
     p.slow = Math.max(0, p.slow - dt);
     p.haste = Math.max(0, p.haste - dt);
@@ -1236,7 +1259,7 @@ class Game {
     const sites = RELIC_BUILDING_SITES.filter(site => (this.player[`${site.skill}Level`] || 0) === lowestLevel && lowestLevel < ACTIVE_SKILL_MAX_LEVEL);
     if (!sites.length) return;
     const site = sites[Math.floor(Math.random() * sites.length)];
-    const minDistance = Math.max(220, Math.min(340, Math.max(this.width, this.height) * .48));
+    const minDistance = relicSpawnMinDistance(this.width, this.height);
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const angle = Math.random() * TAU;
       const distance = minDistance + Math.random() * 110;
@@ -1276,11 +1299,30 @@ class Game {
     p.flash = 1;
     p.hitPulse = 1;
     p.slow = Math.max(p.slow, slow);
-    this.shake = Math.max(this.shake, 4);
-    this.rings.push({ x: p.x, y: p.y, radius: 5, max: 72, life: .36, color: '#ff597a' });
-    this.particles.push(...Array.from({ length: 6 }, () => ({ x: p.x + (Math.random() - .5) * 14, y: p.y + (Math.random() - .5) * 14, vx: (Math.random() - .5) * 74, vy: (Math.random() - .5) * 74, life: .22, max: .22, color: '#ff8d97', size: 2 })));
+    this.shake = Math.max(this.shake, 8);
+    this.rings.push({ x: p.x, y: p.y, radius: 5, max: 100, life: .48, color: '#ff597a' });
+    this.particles.push(...Array.from({ length: 12 }, () => ({ x: p.x + (Math.random() - .5) * 18, y: p.y + (Math.random() - .5) * 18, vx: (Math.random() - .5) * 110, vy: (Math.random() - .5) * 110, life: .3, max: .3, color: '#ff8d97', size: 2.5 + Math.random() * 1.5 })));
     if (p.hp <= 0) this.finish(false);
     return true;
+  }
+
+  enterEndlessMode() {
+    this.endless = true;
+    this.endlessCycle += 1;
+    this.boss = null;
+    this.bossSpawned = false;
+    this.biomeIndex = BIOMES.length - 1;
+    this.stageTime = 0;
+    this.loadBiomeSprites(this.biomeIndex);
+    void this.preloadStage(this.biomeIndex);
+    this.biomeNotice = 3.8;
+    this.spawnTimer = .7 / this.difficulty.spawnRate;
+    this.enemyBullets = [];
+    this.buildings = makeRelicBuildings(BIOMES[this.biomeIndex].terrain, this.player);
+    this.relicTimer = 4;
+    this.setMusicStage(musicStageFor(this.biomeIndex));
+    this.pickupNotice = { text: `无尽模式 · 第 ${this.endlessCycle} 轮开始`, color: '#ffd06c', life: 2.8 };
+    this.rings.push({ x: this.player.x, y: this.player.y, radius: 10, max: 210, life: .9, color: '#ffd06c' });
   }
 
   killEnemy(enemy) {
@@ -1291,7 +1333,7 @@ class Game {
       this.particles.push(...Array.from({ length: 45 }, () => ({ x: enemy.x, y: enemy.y, vx: (Math.random() - .5) * 360, vy: (Math.random() - .5) * 360, life: .65 + Math.random() * .4, max: 1, color: Math.random() > .5 ? '#ffd37a' : '#ff749a', size: 2 + Math.random() * 4 })));
       const nextBiome = nextBiomeAfterBoss(enemy.biomeIndex ?? this.biomeIndex);
       if (nextBiome === null) {
-        this.finish(true);
+        this.enterEndlessMode();
         return;
       }
       this.boss = null;
@@ -1304,7 +1346,7 @@ class Game {
       this.biomeNotice = 3.4;
       this.spawnTimer = .7 / this.difficulty.spawnRate;
       this.enemyBullets = [];
-      this.buildings = makeRelicBuildings(BIOMES[this.biomeIndex].terrain);
+      this.buildings = makeRelicBuildings(BIOMES[this.biomeIndex].terrain, this.player);
       this.relicTimer = 4;
       this.setMusicStage(musicStageFor(this.biomeIndex));
       this.rings.push({ x: this.player.x, y: this.player.y, radius: 10, max: 180, life: .75, color: BIOMES[this.biomeIndex].accent });
@@ -1520,6 +1562,7 @@ class Game {
     if (this.xp >= this.nextXp) {
       this.xp -= this.nextXp;
       this.level += 1;
+      growPlayerStatsOnLevel(this.player, this.level);
       this.nextXp = Math.ceil(this.nextXp * 1.38 + 2);
       this.levelUp();
     }
@@ -1699,6 +1742,7 @@ class Game {
     this.drawOrbit(ctx);
     this.drawPlayer(ctx);
     ctx.restore();
+    this.drawHitFeedback(ctx);
     this.drawHud(ctx);
     this.drawBossBar(ctx);
     this.drawBossArrow(ctx);
@@ -2170,9 +2214,12 @@ class Game {
       ctx.globalAlpha = 1;
     }
     if (p.hitPulse > 0) {
-      ctx.globalAlpha = .12 + p.hitPulse * .18;
-      ctx.strokeStyle = '#ff8d97'; ctx.lineWidth = 2; ctx.shadowColor = '#ff8d97'; ctx.shadowBlur = 9;
-      ctx.beginPath(); ctx.arc(0, 2, p.r + 7, 0, TAU); ctx.stroke();
+      ctx.globalAlpha = .22 + p.hitPulse * .3;
+      ctx.strokeStyle = '#ff6f82'; ctx.lineWidth = 4; ctx.shadowColor = '#ff6f82'; ctx.shadowBlur = 16;
+      ctx.beginPath(); ctx.arc(0, 2, p.r + 11, 0, TAU); ctx.stroke();
+      ctx.globalAlpha = .12 + p.hitPulse * .14;
+      ctx.fillStyle = '#ff526d';
+      ctx.beginPath(); ctx.arc(0, 0, p.r + 4, 0, TAU); ctx.fill();
       ctx.globalAlpha = 1;
     }
     ctx.globalAlpha = p.invuln > 0 ? .55 + Math.sin(this.time * 22) * .3 : 1;
@@ -2259,6 +2306,18 @@ class Game {
     ctx.fillRect(x, y, width * clamp(ratio, 0, 1), height);
   }
 
+  drawHitFeedback(ctx) {
+    const intensity = hitFeedbackAlpha(this.player?.flash);
+    if (!intensity) return;
+    ctx.save();
+    ctx.fillStyle = `rgba(255, 42, 72, ${intensity})`;
+    ctx.fillRect(0, 0, this.width, this.height);
+    ctx.strokeStyle = `rgba(255, 220, 226, ${Math.min(.72, intensity * 2.4)})`;
+    ctx.lineWidth = 4 + intensity * 7;
+    ctx.strokeRect(2, 2, this.width - 4, this.height - 4);
+    ctx.restore();
+  }
+
   drawHud(ctx) {
     const p = this.player;
     const biome = BIOMES[this.biomeIndex];
@@ -2301,7 +2360,11 @@ class Game {
       ctx.fillText(line, 20, 76 + index * 13);
     });
     const activeBoss = bossBarVisible(this.boss);
-    const objective = activeBoss ? this.boss.name : `火种迁徙 ${Math.max(0, Math.ceil(BOSS_TIME - this.stageTime))}s`;
+    const objective = activeBoss
+      ? this.boss.name
+      : this.endless
+        ? `无尽轮回 ${this.endlessCycle} · ${Math.max(0, Math.ceil(BOSS_TIME - this.stageTime))}s`
+        : `火种迁徙 ${Math.max(0, Math.ceil(BOSS_TIME - this.stageTime))}s`;
     ctx.textAlign = 'right';
     ctx.fillStyle = activeBoss ? '#f1b1b5' : '#d3e6ad';
     ctx.fillText(objective, this.width - 18, 33);
@@ -2390,10 +2453,10 @@ class Game {
     ctx.fillRect(30, this.height * .39, this.width - 60, 65);
     ctx.fillStyle = biome.accent;
     ctx.font = '800 21px system-ui';
-    ctx.fillText(`生态阶段 ${this.biomeIndex + 1} · ${biome.name}`, this.width / 2, this.height * .39 + 28);
+    ctx.fillText(this.endless ? `无尽轮回 · 第 ${this.endlessCycle} 轮` : `生态阶段 ${this.biomeIndex + 1} · ${biome.name}`, this.width / 2, this.height * .39 + 28);
     ctx.fillStyle = '#e8f1dc';
     ctx.font = '500 12px system-ui';
-    ctx.fillText(biome.subtitle, this.width / 2, this.height * .39 + 49);
+    ctx.fillText(this.endless ? '赤焰巨猿将再次降临，敌人持续强化' : biome.subtitle, this.width / 2, this.height * .39 + 49);
     ctx.restore();
   }
 }
@@ -2432,7 +2495,7 @@ function boot() {
 }
 
 if (typeof document === 'undefined') {
-globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss, wrapCanvasText };
+globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, growPlayerStatsOnLevel, endlessMultiplier, hitFeedbackAlpha, relicSpawnMinDistance, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss, wrapCanvasText };
 } else {
   boot();
 }

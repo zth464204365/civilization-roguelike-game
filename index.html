@@ -121,9 +121,9 @@
       #leaderboard li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 8px; background: rgba(140, 187, 107, .1); color: #d7e7d1; font-size: 11px; }
       #leaderboard li strong { color: #ffd27a; font-size: 11px; white-space: nowrap; }
       #leaderboard .leaderboard-empty { justify-content: center; color: #9fb6a4; }
-      #dash { right: 96px; bottom: max(22px, env(safe-area-inset-bottom)); }
-      #spear { right: 96px; bottom: max(96px, calc(env(safe-area-inset-bottom) + 74px)); }
-      #ward { right: 18px; bottom: max(104px, calc(env(safe-area-inset-bottom) + 82px)); }
+      #dash { right: 112px; bottom: max(24px, env(safe-area-inset-bottom)); }
+      #spear { right: 24px; bottom: max(112px, calc(env(safe-area-inset-bottom) + 88px)); }
+      #ward { right: 112px; bottom: max(112px, calc(env(safe-area-inset-bottom) + 88px)); }
       @media (hover: hover) and (pointer: fine) {
         #joystick { display: none !important; }
       }
@@ -142,8 +142,8 @@
         #joystick { left: max(22px, calc(env(safe-area-inset-left) + 16px)); right: auto; bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px)); width: 118px; height: 118px; }
         #nova { right: max(22px, calc(env(safe-area-inset-right) + 16px)); bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px)); }
         #dash { left: auto; right: max(110px, calc(env(safe-area-inset-right) + 104px)); bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px)); }
-        #spear { left: auto; right: max(110px, calc(env(safe-area-inset-right) + 104px)); bottom: max(92px, calc(env(safe-area-inset-bottom) + 86px)); }
-        #ward { left: auto; right: max(22px, calc(env(safe-area-inset-right) + 16px)); bottom: max(104px, calc(env(safe-area-inset-bottom) + 98px)); }
+        #spear { left: auto; right: max(22px, calc(env(safe-area-inset-right) + 16px)); bottom: max(92px, calc(env(safe-area-inset-bottom) + 86px)); }
+        #ward { left: auto; right: max(110px, calc(env(safe-area-inset-right) + 104px)); bottom: max(92px, calc(env(safe-area-inset-bottom) + 86px)); }
         .tips { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       }
     </style>
@@ -161,7 +161,7 @@
         <div class="panel">
           <p class="eyebrow">PRIMAL SURVIVAL ROGUELITE</p>
           <h1>文明火种</h1>
-          <p class="intro">选择迁徙难度后立即开始。攻击会从萌芽进化为猎手与火种，击败赤焰巨猿，守住文明火种。</p>
+          <p class="intro">选择迁徙难度后立即开始。攻击会从萌芽进化为猎手与火种，击败三阶段 Boss 后进入无尽轮回。</p>
           <p id="asset-status" aria-live="polite">第一阶段贴图后台加载中 · 可直接开始</p>
           <div id="difficulty-list" aria-label="选择游戏难度">
             <button class="difficulty-choice" data-difficulty="gentle"><strong>游猎</strong><span>敌人较弱<br>移动较慢</span></button>
@@ -201,6 +201,6 @@
         </div>
       </section>
     </main>
-    <script src="./game.mjs?v=20260830-4"></script>
+    <script src="./game.mjs?v=20260830-5"></script>
   </body>
 </html>
