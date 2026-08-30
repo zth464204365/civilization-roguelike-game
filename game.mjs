@@ -425,7 +425,7 @@ function saveLeaderboardEntry(name, score, difficulty, time, storage = leaderboa
 }
 
 const MUSIC_LOOP_SECONDS = 8;
-const MUSIC_GAIN = 1.10;
+const MUSIC_GAIN = 1.18;
 const MUSIC_STAGES = [
   { energy: .10, bass: [-12, -8, -5, -10], melody: [7, 10, 12, 10, 7, 5, 3, 5, 10, 12, 15, 12, 10, 7, 5, 3] },
   { energy: .26, bass: [-10, -7, -3, -8], melody: [5, 8, 10, 12, 10, 8, 5, 3, 8, 10, 13, 12, 10, 8, 5, 1] },
@@ -494,21 +494,40 @@ function createMusicLoop(context, stage = 0) {
       samples[index] += (Math.sin(TAU * frequency * time) + Math.sin(TAU * frequency * 2 * time) * harmonic) * envelope * volume;
     }
   };
+  const addKick = (start, volume) => {
+    const first = Math.max(0, Math.floor(start * context.sampleRate));
+    const last = Math.min(frames, Math.ceil((start + .18) * context.sampleRate));
+    for (let index = first; index < last; index += 1) {
+      const time = (index - first) / context.sampleRate;
+      const envelope = Math.min(1, time / .006) * Math.exp(-time * 23);
+      const phase = TAU * (48 * time + 76 * (1 - Math.exp(-time * 25)) / 25);
+      samples[index] += Math.sin(phase) * envelope * volume;
+    }
+  };
+  const addNoise = (start, duration, volume) => {
+    const first = Math.max(0, Math.floor(start * context.sampleRate));
+    const last = Math.min(frames, Math.ceil((start + duration) * context.sampleRate));
+    for (let index = first; index < last; index += 1) {
+      const time = (index - first) / context.sampleRate;
+      const envelope = Math.min(1, time / .006) * Math.exp(-time * 34);
+      samples[index] += Math.sin((index + stage * 97) * 12.9898) * envelope * volume;
+    }
+  };
   for (let bar = 0; bar < profile.bass.length; bar += 1) {
     const start = bar * 2;
-    addTone(start, 1.55, profile.bass[bar], .105 + energy * .025, .08 + energy * .12);
+    const root = profile.bass[bar];
     for (let beat = 0; beat < 4; beat += 1) {
       const beatStart = start + beat * .5;
-      addTone(beatStart, .3, profile.bass[bar] + (beat === 2 ? 7 : 12), .035 + energy * .027, .2 + energy * .28);
-      if (energy > .08) addTone(beatStart, .055, profile.bass[bar] - 24, .008 + energy * .018, .05);
-      if (energy > .35 && beat % 2 === 1) addTone(beatStart + .25, .045, profile.bass[bar] - 17, .010 + energy * .020, .15);
-      if (energy > .32) addTone(beatStart + .18, .08, profile.bass[bar] - 12, .018 + energy * .035, .72);
-      if (energy > .5) addTone(beatStart + .25, .06, profile.bass[bar] - 19, .012 + energy * .022, .86);
-      if (energy > .68) addTone(beatStart + .36, .055, profile.bass[bar] + 19, .016 + energy * .028, .58);
+      addKick(beatStart, .09 + energy * .075);
+      addTone(beatStart, .31, root, .078 + energy * .038, .10);
+      if (beat === 1 || beat === 3) addNoise(beatStart, .12, .012 + energy * .028);
+      if (energy > .2) addNoise(beatStart + .25, .055, .006 + energy * .015);
+      if (energy > .6) addNoise(beatStart + .375, .035, .004 + energy * .011);
     }
+    addTone(start, .72, root + 12, .018 + energy * .015, .14);
   }
-  profile.melody.forEach((note, index) => addTone(index * .5 + .04, .32, note, .045 + energy * .030, .25 + energy * .38));
-  for (let index = 0; index < samples.length; index += 1) samples[index] = Math.tanh(samples[index] * (1.35 + energy * .42)) * .6;
+  profile.melody.forEach((note, index) => addTone(index * .5 + .055, .24, note, .032 + energy * .027, .12 + energy * .18));
+  for (let index = 0; index < samples.length; index += 1) samples[index] = Math.tanh(samples[index] * (1.16 + energy * .32)) * .66;
   return buffer;
 }
 
@@ -735,13 +754,21 @@ class Game {
 
   start(difficultyId) {
     if (!this.initialAssetsReady) return;
+    this.enterLandscape();
     this.reset(difficultyId);
     void this.preloadStage(1);
-    if (screen.orientation?.lock) void screen.orientation.lock('landscape').catch(() => {});
     this.startMusic();
     this.dom.start.hidden = true;
     this.dom.end.hidden = true;
     this.dom.upgrade.hidden = true;
+  }
+
+  enterLandscape() {
+    const container = this.canvas.parentElement;
+    const requestFullscreen = container?.requestFullscreen || container?.webkitRequestFullscreen;
+    const lock = () => { if (screen.orientation?.lock) void screen.orientation.lock('landscape').catch(() => {}); };
+    if (!requestFullscreen || document.fullscreenElement) { lock(); return; }
+    void Promise.resolve(requestFullscreen.call(container, { navigationUI: 'hide' })).catch(() => {}).then(lock);
   }
 
   showDifficulty() {
@@ -2241,8 +2268,17 @@ class Game {
     ctx.fillStyle = '#eff5dc';
     ctx.font = '700 13px system-ui';
     ctx.fillText(`${biome.name} · ${this.difficulty.short} · Lv.${this.level}`, 20, 33);
-    this.drawBar(ctx, 20, 41, Math.min(180, this.width - 100), 9, p.hp / p.maxHp, '#db7875');
-    this.drawBar(ctx, 20, 56, Math.min(180, this.width - 100), 6, this.xp / this.nextXp, '#b5df76');
+    const resourceWidth = Math.min(180, this.width - 100);
+    this.drawBar(ctx, 20, 41, resourceWidth, 9, p.hp / p.maxHp, '#db7875');
+    this.drawBar(ctx, 20, 56, resourceWidth, 6, this.xp / this.nextXp, '#b5df76');
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff4ea';
+    ctx.font = '800 8px system-ui';
+    ctx.fillText(`${Math.max(0, Math.ceil(p.hp))} / ${p.maxHp}`, 20 + resourceWidth / 2, 49);
+    ctx.fillStyle = '#dff3c1';
+    ctx.font = '800 7px system-ui';
+    ctx.fillText(`${this.xp} / ${this.nextXp}`, 20 + resourceWidth / 2, 62);
+    ctx.textAlign = 'left';
     ctx.fillStyle = growthForm(p.growthStage).color;
     ctx.font = '700 11px system-ui';
     ctx.fillText(growthForm(p.growthStage).name, 210, 61);

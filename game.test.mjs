@@ -5,6 +5,7 @@ import vm from 'node:vm';
 const sandbox = {};
 vm.createContext(sandbox);
 const gameSource = readFileSync(new URL('./game.mjs', import.meta.url), 'utf8');
+const indexSource = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
 vm.runInContext(gameSource, sandbox);
 const { chooseUnique, clamp, joystickVector, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, growthForm, stageClock, nextBiomeAfterBoss } = sandbox.__civilizationTest;
 
@@ -18,6 +19,9 @@ assert.ok(Math.abs(Math.hypot(diagonalJoystick.x, diagonalJoystick.y) - 1) < 0.0
 assert.equal(gameSource.includes('setPointerCapture'), false);
 assert.ok(gameSource.includes('this.preloadStage(0)'));
 assert.ok(gameSource.includes('void this.preloadStage(1)'));
+assert.ok(gameSource.includes('requestFullscreen'));
+assert.equal(indexSource.includes('id="rotate-screen"'), false);
+assert.ok(gameSource.includes('Math.ceil(p.hp)'));
 assert.equal(gameSource.includes('for (const [kind, art] of Object.entries(ENEMY_ART))'), false);
 assert.deepEqual(Array.from(chooseUnique(['a', 'b', 'c'], 3, () => 0)), ['a', 'b', 'c']);
 assert.equal(new Set(chooseUnique(['a', 'b', 'c'], 3)).size, 3);
