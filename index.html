@@ -2,8 +2,11 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#09242f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="./manifest.webmanifest" />
     <title>文明火种 · 蛮荒生存肉鸽</title>
     <link rel="preload" as="image" href="./assets/evolution-guide.webp?v=20260825-3" />
     <link rel="preload" as="image" href="./assets/enemy-tide-snail.webp?v=20260827-1" />
@@ -26,6 +29,13 @@
       #game-wrap {
         position: relative; width: min(100vw, 1280px); height: min(100dvh, 720px); overflow: hidden;
         border-radius: 20px; background: #09242f; box-shadow: 0 0 60px rgba(93, 177, 132, .2);
+      }
+      /* iOS Safari and a few embedded browsers cannot lock orientation. Once
+         the game has started, the JS fallback rotates the whole game surface
+         while keeping its logical canvas coordinates in landscape. */
+      body.portrait-fallback #game-wrap {
+        width: 100dvh; height: 100vw; max-width: none; max-height: none;
+        border-radius: 0; transform: rotate(90deg); transform-origin: center center;
       }
       canvas { display: block; width: 100%; height: 100%; touch-action: none; }
       .overlay {

@@ -263,6 +263,21 @@ const BOSS_SHOT_ART = {
   reversionBoss: { id: 'flame', color: '#ff9a59', glow: '#ffd26f', sprite: 'flame' },
 };
 
+// Each boss alternates between two readable attack patterns. Keeping the
+// pattern names in data makes variety easy to balance without spreading
+// boss-specific magic numbers through the update loop.
+const BOSS_ATTACK_VARIANTS = {
+  tideBoss: ['bubbleFan', 'tideRing'],
+  groveBoss: ['leafFan', 'rootLattice'],
+  reversionBoss: ['flamePulse', 'flameRain'],
+};
+
+function bossAttackVariant(enemy) {
+  const variants = BOSS_ATTACK_VARIANTS[enemy?.kind] || [];
+  if (!variants.length) return null;
+  return variants[Math.abs(Math.floor(enemy?.bossPattern || 0)) % variants.length];
+}
+
 function bossShotArt(enemy) {
   return enemy?.boss ? BOSS_SHOT_ART[enemy.kind] || null : null;
 }
@@ -624,6 +639,7 @@ class Game {
     this.musicSource = null;
     this.musicSourceGain = null;
     this.musicStage = -1;
+    this.portraitFallback = false;
     this.initialAssetsReady = false;
     this.stagePreloads = [];
     this.sprite = new Image();
@@ -644,6 +660,8 @@ class Game {
     this.resize();
     this.bindInput();
     window.addEventListener('resize', () => this.resize());
+    window.addEventListener('orientationchange', () => this.syncOrientationLayout());
+    document.addEventListener('fullscreenchange', () => this.syncOrientationLayout());
     requestAnimationFrame(time => this.frame(time));
   }
 
@@ -835,10 +853,64 @@ class Game {
 
   enterLandscape() {
     const container = this.canvas.parentElement;
-    const requestFullscreen = container?.requestFullscreen || container?.webkitRequestFullscreen;
-    const lock = () => { if (screen.orientation?.lock) void screen.orientation.lock('landscape').catch(() => {}); };
-    if (!requestFullscreen || document.fullscreenElement) { lock(); return; }
-    void Promise.resolve(requestFullscreen.call(container, { navigationUI: 'hide' })).catch(() => {}).then(lock);
+    const fullscreenTarget = [container, document.documentElement].find(target => target?.requestFullscreen || target?.webkitRequestFullscreen || target?.webkitRequestFullScreen);
+    const requestFullscreen = fullscreenTarget?.requestFullscreen || fullscreenTarget?.webkitRequestFullscreen || fullscreenTarget?.webkitRequestFullScreen;
+    const lock = async () => {
+      const orientation = globalThis.screen?.orientation;
+      if (!orientation?.lock) return false;
+      for (const mode of ['landscape-primary', 'landscape']) {
+        try {
+          await orientation.lock(mode);
+          return true;
+        } catch {
+          // Some browsers accept only one of the two landscape tokens.
+        }
+      }
+      return false;
+    };
+    const fallback = () => {
+      if (this.isPortraitViewport()) this.setPortraitFallback(true);
+    };
+    const lockOrFallback = async () => {
+      const locked = await lock();
+      if (!locked && this.isPortraitViewport()) fallback();
+    };
+    if (document.fullscreenElement) {
+      void lockOrFallback();
+      return;
+    }
+    if (!requestFullscreen) {
+      void lockOrFallback();
+      return;
+    }
+    try {
+      const request = requestFullscreen.call(fullscreenTarget, { navigationUI: 'hide' });
+      void Promise.resolve(request).then(lockOrFallback).catch(lockOrFallback);
+    } catch {
+      void lockOrFallback();
+    }
+  }
+
+  isPortraitViewport() {
+    return window.matchMedia?.('(orientation: portrait)').matches ?? this.width < this.height;
+  }
+
+  setPortraitFallback(enabled) {
+    const next = Boolean(enabled && this.isPortraitViewport());
+    if (next === this.portraitFallback) return;
+    this.portraitFallback = next;
+    document.body.classList.toggle('portrait-fallback', next);
+    this.resize();
+  }
+
+  syncOrientationLayout() {
+    if (!this.isPortraitViewport() && this.portraitFallback) {
+      this.portraitFallback = false;
+      document.body.classList.remove('portrait-fallback');
+      this.resize();
+    } else if (this.portraitFallback) {
+      this.resize();
+    }
   }
 
   showDifficulty() {
@@ -860,8 +932,8 @@ class Game {
 
   resize() {
     const rect = this.canvas.getBoundingClientRect();
-    this.width = Math.max(1, rect.width);
-    this.height = Math.max(1, rect.height);
+    this.width = Math.max(1, this.portraitFallback ? rect.height : rect.width);
+    this.height = Math.max(1, this.portraitFallback ? rect.width : rect.height);
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(this.width * this.dpr);
     this.canvas.height = Math.round(this.height * this.dpr);
@@ -888,7 +960,7 @@ class Game {
     return {
       ...stats, ...position, kind, boss, hit: 0, attack: 0,
       skillTimer: .5 + Math.random() * stats.skillEvery,
-      dash: 0, dashAngle: 0, windup: 0, shield: 0, enraged: false, phase: Math.random() * TAU, facing: 4, flipX: false, phaseTwo: false,
+      dash: 0, dashAngle: 0, windup: 0, shield: 0, enraged: false, phase: Math.random() * TAU, facing: 4, flipX: false, phaseTwo: false, bossPattern: 0,
     };
   }
 
@@ -905,7 +977,11 @@ class Game {
     window.addEventListener('keyup', event => this.keys.delete(event.key.toLowerCase()));
     const point = event => {
       const rect = this.canvas.getBoundingClientRect();
-      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      // CSS rotation fallback presents a landscape canvas inside a portrait
+      // viewport; map screen coordinates back into its logical orientation.
+      return this.portraitFallback ? { x: y, y: rect.width - x } : { x, y };
     };
     const joystickOffset = event => {
       const rect = this.dom.joystick.getBoundingClientRect();
@@ -1444,6 +1520,55 @@ class Game {
     this.rings.push({ x: enemy.x + dx / distance * range, y: enemy.y + dy / distance * range, radius: 6, max: 34, life: .35, color: '#a8d86b' });
   }
 
+  fireTideRing(enemy) {
+    const bossArt = bossShotArt(enemy);
+    if (!bossArt) return;
+    this.loadEffectSprite(bossArt.sprite);
+    const count = 10;
+    for (let index = 0; index < count && this.enemyBullets.length < 36; index += 1) {
+      const angle = index / count * TAU + this.time * .18;
+      this.enemyBullets.push({
+        kind: enemy.shotKind, x: enemy.x, y: enemy.y,
+        vx: Math.cos(angle) * enemy.shotSpeed * .72, vy: Math.sin(angle) * enemy.shotSpeed * .72,
+        r: 6, damage: enemy.damage * .52, slow: ENEMY_SHOT_STYLES[enemy.shotKind]?.slow || 0,
+        life: 2.65, bossArt: bossArt.id, bossSprite: bossArt.sprite,
+      });
+    }
+    this.rings.push({ x: enemy.x, y: enemy.y, radius: enemy.radius, max: enemy.radius * 2.6, life: .5, color: bossArt.color });
+  }
+
+  fireRootLattice(enemy, dx, dy, distance) {
+    const bossArt = bossShotArt(enemy);
+    if (!bossArt) return;
+    this.loadEffectSprite(bossArt.sprite);
+    const center = Math.atan2(dy, dx);
+    const range = Math.min(190, Math.max(86, distance - 38));
+    for (let index = 0; index < 3 && this.enemyBullets.length < 36; index += 1) {
+      const angle = center + (index - 1) * .72;
+      const x = enemy.x + Math.cos(angle) * range;
+      const y = enemy.y + Math.sin(angle) * range;
+      this.enemyBullets.push({ kind: 'root', x, y, vx: 0, vy: 0, r: 24, damage: enemy.damage * .5, slow: 1.8, life: 2.5, zone: true, bossArt: bossArt.id, bossSprite: bossArt.sprite });
+      this.rings.push({ x, y, radius: 8, max: 42, life: .45, color: bossArt.color });
+    }
+  }
+
+  fireFlameRain(enemy, dx, dy, distance) {
+    const bossArt = bossShotArt(enemy);
+    if (!bossArt) return;
+    this.loadEffectSprite(bossArt.sprite);
+    const targetX = enemy.x + dx;
+    const targetY = enemy.y + dy;
+    const count = 5;
+    for (let index = 0; index < count && this.enemyBullets.length < 36; index += 1) {
+      const angle = index / count * TAU + this.time * .11;
+      const radius = index === 0 ? 0 : 54 + (index % 2) * 18;
+      const x = targetX + Math.cos(angle) * radius;
+      const y = targetY + Math.sin(angle) * radius;
+      this.enemyBullets.push({ kind: 'fire', x, y, vx: 0, vy: 0, r: 23, damage: enemy.damage * .7, slow: 0, life: 1.9, zone: true, bossArt: bossArt.id, bossSprite: bossArt.sprite });
+    }
+    this.rings.push({ x: targetX, y: targetY, radius: 10, max: 76, life: .42, color: bossArt.color });
+  }
+
   castEnemySkill(enemy, dx, dy, distance) {
     if (enemy.skill === 'melee') {
       enemy.skillTimer = enemy.skillEvery;
@@ -1464,14 +1589,20 @@ class Game {
       this.rings.push({ x: enemy.x, y: enemy.y, radius: enemy.radius, max: 54, life: .24, color: enemy.color });
       return;
     }
+    const bossVariant = enemy.boss ? bossAttackVariant(enemy) : null;
+    if (enemy.boss) enemy.bossPattern = (enemy.bossPattern + 1) % (BOSS_ATTACK_VARIANTS[enemy.kind]?.length || 1);
     if (enemy.skill === 'tide') {
-      this.fireEnemyShots(enemy, dx, dy);
+      if (bossVariant === 'tideRing') this.fireTideRing(enemy);
+      else this.fireEnemyShots(enemy, dx, dy);
       enemy.skillTimer = enemy.skillEvery;
       return;
     }
     if (enemy.skill === 'grove') {
-      this.fireEnemyShots(enemy, dx, dy);
-      this.fireRootZone(enemy, dx, dy, distance);
+      if (bossVariant === 'rootLattice') this.fireRootLattice(enemy, dx, dy, distance);
+      else {
+        this.fireEnemyShots(enemy, dx, dy);
+        this.fireRootZone(enemy, dx, dy, distance);
+      }
       enemy.skillTimer = enemy.skillEvery;
       return;
     }
@@ -1485,7 +1616,8 @@ class Game {
       enemy.skillTimer = enemy.skillEvery;
       this.rings.push({ x: enemy.x, y: enemy.y, radius: 7, max: radius, life: .45, color: enemy.color });
       if (distance < radius) this.hurtPlayer(enemy.damage * (enemy.skillPower || 1));
-      if (enemy.boss) this.fireEnemyShots(enemy, dx, dy);
+      if (enemy.boss && bossVariant === 'flameRain') this.fireFlameRain(enemy, dx, dy, distance);
+      else if (enemy.boss) this.fireEnemyShots(enemy, dx, dy);
       if (enemy.boss) this.shake = Math.max(this.shake, 6);
       return;
     }
@@ -2544,7 +2676,7 @@ function boot() {
 }
 
 if (typeof document === 'undefined') {
-globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, runeMaxFor, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, growPlayerStatsOnLevel, endlessMultiplier, tuneBossStats, hitFeedbackAlpha, relicSpawnMinDistance, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, skillMaxLevel, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, bossSpawnInterval, endlessSpawnCount, nextExperienceTarget, growthForm, stageClock, nextBiomeAfterBoss, wrapCanvasText };
+globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, runeMaxFor, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, BOSS_ATTACK_VARIANTS, bossAttackVariant, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, growPlayerStatsOnLevel, endlessMultiplier, tuneBossStats, hitFeedbackAlpha, relicSpawnMinDistance, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, skillMaxLevel, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, bossSpawnInterval, endlessSpawnCount, nextExperienceTarget, growthForm, stageClock, nextBiomeAfterBoss, wrapCanvasText };
 } else {
   boot();
 }

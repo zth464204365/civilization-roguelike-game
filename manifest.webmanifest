@@ -1,0 +1,10 @@
+{
+  "name": "文明火种 · 蛮荒生存肉鸽",
+  "short_name": "文明火种",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#03110d",
+  "theme_color": "#09242f",
+  "icons": []
+}
