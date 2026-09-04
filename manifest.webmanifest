@@ -3,7 +3,7 @@
   "short_name": "文明火种",
   "start_url": "./",
   "display": "fullscreen",
-  "orientation": "landscape",
+  "orientation": "portrait",
   "background_color": "#03110d",
   "theme_color": "#09242f",
   "icons": []

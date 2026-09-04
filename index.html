@@ -8,43 +8,41 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <title>文明火种 · 蛮荒生存肉鸽</title>
-    <link rel="preload" as="image" href="./assets/evolution-guide.webp?v=20260825-3" />
-    <link rel="preload" as="image" href="./assets/enemy-tide-snail.webp?v=20260827-1" />
-    <link rel="preload" as="image" href="./assets/enemy-grit-worm.webp?v=20260827-1" />
-    <link rel="preload" as="image" href="./assets/enemy-reef-crab.webp?v=20260827-1" />
-    <link rel="preload" as="image" href="./assets/savage.webp?v=20260825-6" />
-    <link rel="preload" as="image" href="./assets/boss-tide-crab.webp?v=20260828-1" />
-    <link rel="preload" as="image" href="./assets/shore-reef.webp?v=20260825-7" />
-    <link rel="preload" as="image" href="./assets/relic-tide-ruin.webp?v=20260828-1" />
-    <link rel="preload" as="image" href="./assets/fan.webp?v=20260827-14" />
-    <link rel="preload" as="image" href="./assets/hurricane.webp?v=20260827-14" />
-    <link rel="preload" as="image" href="./assets/boss-bubble.webp?v=20260828-1" />
+    <link rel="preload" as="image" type="image/webp" href="./assets/evolution-guide.webp?v=20260825-3" />
+    <link rel="preload" as="image" type="image/webp" href="./assets/enemy-tide-snail.webp?v=20260827-1" />
+    <link rel="preload" as="image" type="image/webp" href="./assets/boss-tide-crab.webp?v=20260828-1" />
     <style>
       :root { color-scheme: dark; font-family: "Microsoft YaHei", system-ui, sans-serif; }
       * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      html { width: 100%; height: 100%; }
       body {
-        margin: 0; min-height: 100dvh; overflow: hidden; background: #03110d;
+        margin: 0; min-height: 100vh; min-height: 100dvh; overflow: hidden; background: #03110d;
         display: grid; place-items: center; color: #f5f7ff;
       }
       #game-wrap {
-        position: relative; width: min(100vw, 1280px); height: min(100dvh, 720px); overflow: hidden;
+        position: relative; width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh; aspect-ratio: 16 / 9; overflow: hidden;
         border-radius: 20px; background: #09242f; box-shadow: 0 0 60px rgba(93, 177, 132, .2);
       }
-      /* iOS Safari and a few embedded browsers cannot lock orientation. Once
-         the game has started, the JS fallback rotates the whole game surface
-         while keeping its logical canvas coordinates in landscape. */
-      body.portrait-fallback #game-wrap {
-        width: 100dvh; height: 100vw; max-width: none; max-height: none;
-        border-radius: 0; transform: rotate(90deg); transform-origin: center center;
+      @supports (aspect-ratio: 1 / 1) {
+        #game-wrap { width: min(100vw, 177.78vh, 1280px); height: min(100vh, 56.25vw, 720px); }
       }
+      @supports (aspect-ratio: 1 / 1) and (height: 100dvh) {
+        #game-wrap { width: min(100vw, 177.78dvh, 1280px); height: min(100dvh, 56.25vw, 720px); }
+      }
+      @media (pointer: coarse) {
+        #game-wrap { width: 100vw; height: 100vh; height: 100dvh; max-width: none; max-height: none; aspect-ratio: auto; border-radius: 0; }
+      }
+      /* The JS class covers mobile WebViews that report a fine pointer. */
+      body.mobile-device #game-wrap { width: 100vw; height: 100vh; height: 100dvh; max-width: none; max-height: none; aspect-ratio: auto; border-radius: 0; }
       canvas { display: block; width: 100%; height: 100%; touch-action: none; }
       .overlay {
         position: absolute; inset: 0; z-index: 4; display: grid; place-items: center;
         padding: 24px; background: rgba(3, 5, 16, .62); backdrop-filter: blur(8px);
       }
       .overlay[hidden] { display: none; }
+      .portrait-screen { display: none; z-index: 8; }
       .panel {
-        width: min(calc(100vw - 48px), 520px); min-width: 0; max-height: calc(100% - 24px); overflow: auto; padding: 26px 22px; border: 1px solid rgba(173, 211, 147, .42);
+        width: calc(100vw - 48px); width: min(calc(100vw - 48px), 520px); min-width: 0; max-height: calc(100% - 24px); overflow: auto; padding: 26px 22px; border: 1px solid rgba(173, 211, 147, .42);
         border-radius: 24px; background: linear-gradient(145deg, rgba(24, 59, 43, .96), rgba(7, 22, 16, .96));
         box-shadow: 0 18px 60px rgba(0, 0, 0, .42); text-align: center;
       }
@@ -134,27 +132,11 @@
       #dash { right: 112px; bottom: max(24px, env(safe-area-inset-bottom)); }
       #spear { right: 24px; bottom: max(112px, calc(env(safe-area-inset-bottom) + 88px)); }
       #ward { right: 112px; bottom: max(112px, calc(env(safe-area-inset-bottom) + 88px)); }
-      @media (hover: hover) and (pointer: fine) {
+      @media (hover: hover) and (pointer: fine) and (min-width: 901px) {
         #joystick { display: none !important; }
       }
-      @media (orientation: landscape) and (pointer: coarse) {
-        #game-wrap { width: 100vw; height: 100dvh; border-radius: 0; }
-        .panel { width: min(100%, 640px); max-height: calc(100% - 12px); padding: 13px 18px; }
-        .eyebrow { margin-bottom: 4px; font-size: 10px; }
-        h1 { font-size: 32px; }
-        .intro { margin: 7px 0 9px; font-size: 12px; line-height: 1.45; }
-        #asset-status { margin: -1px 0 6px; font-size: 11px; }
-        #difficulty-list { margin: 6px 0 8px; }
-        .difficulty-choice { min-height: 68px; padding: 7px; }
-        .difficulty-choice strong { margin-bottom: 2px; font-size: 13px; }
-        .tips { margin: 8px 0 0; gap: 6px; }
-        .tip { padding: 7px; font-size: 10px; line-height: 1.3; }
-        #joystick { left: max(22px, calc(env(safe-area-inset-left) + 16px)); right: auto; bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px)); width: 118px; height: 118px; }
-        #nova { right: max(22px, calc(env(safe-area-inset-right) + 16px)); bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px)); }
-        #dash { left: auto; right: max(110px, calc(env(safe-area-inset-right) + 104px)); bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px)); }
-        #spear { left: auto; right: max(22px, calc(env(safe-area-inset-right) + 16px)); bottom: max(92px, calc(env(safe-area-inset-bottom) + 86px)); }
-        #ward { left: auto; right: max(110px, calc(env(safe-area-inset-right) + 104px)); bottom: max(92px, calc(env(safe-area-inset-bottom) + 86px)); }
-        .tips { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      @media (orientation: landscape) {
+        body.mobile-device #portrait-screen { display: grid; }
       }
     </style>
   </head>
@@ -167,19 +149,23 @@
       <button id="ward" class="active-skill" hidden aria-label="祖灵护壁，快捷键 R">护壁<small>R · 就绪</small></button>
       <div id="joystick" hidden aria-label="移动方向圆盘" role="application"><span id="joystick-knob"></span></div>
 
+      <section class="overlay portrait-screen" id="portrait-screen" aria-live="polite">
+        <div class="panel"><p class="eyebrow">PORTRAIT PLAY</p><h2>请竖屏游玩</h2><p class="intro">手机端只支持竖屏，旋转回竖屏后继续游戏。</p></div>
+      </section>
+
       <section class="overlay" id="start-screen">
         <div class="panel">
           <p class="eyebrow">PRIMAL SURVIVAL ROGUELITE</p>
           <h1>文明火种</h1>
-          <p class="intro">选择迁徙难度后立即开始。攻击会从萌芽进化为猎手与火种，击败三阶段 Boss 后进入无尽轮回；每个 Boss 都会解锁更高的技能与符文上限。</p>
-          <p id="asset-status" aria-live="polite">第一阶段贴图后台加载中 · 可直接开始</p>
+          <p class="intro">选择迁徙难度后立即开始。攻击会从萌芽进化为猎手与火种，击败三阶段 Boss 后进入无尽轮回；无尽 Boss 会轮换技能，后期还会成对出现，每次击败都能提高成长上限。</p>
+          <p id="asset-status" aria-live="polite">基础贴图后台加载中 · 可直接开始</p>
           <div id="difficulty-list" aria-label="选择游戏难度">
             <button class="difficulty-choice" data-difficulty="gentle"><strong>游猎</strong><span>敌人较弱<br>移动较慢</span></button>
             <button class="difficulty-choice" data-difficulty="normal"><strong>迁徙</strong><span>推荐节奏<br>平衡挑战</span></button>
             <button class="difficulty-choice" data-difficulty="harsh"><strong>试炼</strong><span>敌人更快<br>攻势更强</span></button>
           </div>
           <div class="tips">
-            <div class="tip">手机：开始后会自动尝试全屏横屏；左下摇杆移动，右下技能区可双指同时操作</div>
+            <div class="tip">手机：请竖屏游玩；左下摇杆移动，右下技能区可双指同时操作</div>
             <div class="tip">电脑：WASD / 方向键移动，Q 疾驰，E 飓风，R 护壁，空格脉冲</div>
             <div class="tip">遗迹：击破彩色遗迹，可强化对应的 Q / E / R 主动技能</div>
           </div>
@@ -211,6 +197,6 @@
         </div>
       </section>
     </main>
-    <script src="./game.mjs?v=20260830-6"></script>
+    <script src="./game.mjs?v=20260901-1"></script>
   </body>
 </html>

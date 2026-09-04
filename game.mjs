@@ -1,5 +1,6 @@
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const JOYSTICK_MAX = 32;
+const JOYSTICK_DEADZONE = .1;
 const VAMPIRE_HEAL_PER_HIT = .2;
 const VAMPIRE_RUNE_CHANCE = .02;
 const RUNE_CONFIG = {
@@ -56,7 +57,10 @@ function wrapCanvasText(ctx, text, maxWidth) {
 function joystickVector(offsetX, offsetY, max = JOYSTICK_MAX) {
   const distance = Math.hypot(offsetX, offsetY);
   if (!distance || max <= 0) return { x: 0, y: 0 };
-  const scale = Math.min(1, max / distance) / max;
+  const magnitude = Math.min(1, distance / max);
+  if (magnitude <= JOYSTICK_DEADZONE) return { x: 0, y: 0 };
+  const adjustedMagnitude = (magnitude - JOYSTICK_DEADZONE) / (1 - JOYSTICK_DEADZONE);
+  const scale = adjustedMagnitude / distance;
   return { x: offsetX * scale, y: offsetY * scale };
 }
 const tileNoise = (x, y) => {
@@ -172,6 +176,13 @@ function endlessSpawnCount(cycle) {
   return 1 + Math.min(3, Math.floor(Math.max(0, Number(cycle) || 0) / 2));
 }
 
+function endlessBossCount(cycle) {
+  // One extra Boss every two rounds after the opening round, capped at four
+  // so the fight stays readable even when the rest of the endless scaling is high.
+  const round = Math.max(0, Math.floor(Number(cycle) || 0));
+  return 1 + Math.min(3, Math.floor(Math.max(0, round - 1) / 2));
+}
+
 function pickupIndex(kills, pickupEvery, kinds) {
   return (Math.floor(kills / pickupEvery) - 1) % kinds;
 }
@@ -226,7 +237,8 @@ function mirrorFacing(frame) {
 }
 
 function enemyVisualScale(enemy, art) {
-  return art.scale * art.size * (enemy.boss ? 1.34 : 1) * (1 + Math.min(.14, enemy.xp * .025));
+  const championScale = enemy.boss ? 1.34 : enemy.elite ? 1.16 : 1;
+  return art.scale * art.size * championScale * (1 + Math.min(.14, enemy.xp * .025));
 }
 
 const ENEMY_TYPES = {
@@ -244,6 +256,11 @@ const ENEMY_TYPES = {
   tideBoss: { hp: 620, speed: 39, radius: 42, xp: 14, score: 180, damage: 20, color: '#62aeb8', form: 'boss', name: '潮涌巨蟹', skill: 'tide', skillEvery: 3.65, skillRange: 340, shotKind: 'goo', shotSpeed: 185, shots: 7, shotSpread: .42, sprite: 'tideBoss' },
   groveBoss: { hp: 720, speed: 35, radius: 44, xp: 16, score: 240, damage: 23, color: '#92ad59', form: 'boss', name: '古木守卫', skill: 'grove', skillEvery: 3.15, skillRange: 350, shotKind: 'root', shotSpeed: 190, shots: 5, shotSpread: .18, sprite: 'groveBoss' },
   reversionBoss: { hp: 820, speed: 45, radius: 46, xp: 18, score: 320, damage: 25, color: '#e77c45', form: 'boss', name: '赤焰巨猿', skill: 'pulse', skillEvery: 4.4, skillRange: 300, skillRadius: 175, skillPower: 1.28, shotKind: 'fire', shotSpeed: 215, shots: 5, shotSpread: .2 },
+  skyDrake: { hp: 760, speed: 58, radius: 32, xp: 20, score: 400, damage: 24, color: '#f08a52', form: 'dragon', name: '熔火飞龙', skill: 'dragon', skillEvery: 3.5, skillRange: 430, shotKind: 'fire', shotSpeed: 220, shots: 6, shotSpread: .26 },
+  magmaTitan: { hp: 1150, speed: 29, radius: 52, xp: 25, score: 560, damage: 32, color: '#cf6f4c', form: 'titan', name: '熔岩巨人', skill: 'titan', skillEvery: 4.6, skillRange: 360, skillRadius: 205, skillPower: 1.08, shotKind: 'fire', shotSpeed: 190, shots: 3, shotSpread: .3 },
+  hornedBeast: { hp: 900, speed: 54, radius: 38, xp: 22, score: 460, damage: 29, color: '#d9944e', form: 'horned', name: '熔岩角兽', skill: 'charge', skillEvery: 3.7, skillRange: 390, shotKind: 'fire', shotSpeed: 200, shots: 4, shotSpread: .32 },
+  lavaSerpent: { hp: 680, speed: 66, radius: 28, xp: 19, score: 390, damage: 22, color: '#d85f4f', form: 'serpent', name: '熔岩蛇', skill: 'serpent', skillEvery: 3, skillRange: 420, shotKind: 'root', shotSpeed: 200, shots: 5, shotSpread: .3 },
+  emberImp: { hp: 560, speed: 88, radius: 25, xp: 17, score: 340, damage: 20, color: '#f06e4f', form: 'imp', name: '朱焰小鬼', skill: 'imp', skillEvery: 2.65, skillRange: 380, shotKind: 'fire', shotSpeed: 230, shots: 4, shotSpread: .34 },
 };
 
 const ENEMY_SHOT_STYLES = {
@@ -261,6 +278,11 @@ const BOSS_SHOT_ART = {
   tideBoss: { id: 'bubble', color: '#91e6ee', glow: '#d0fbff', sprite: 'bubble' },
   groveBoss: { id: 'leaf', color: '#c6ec7c', glow: '#effcb7', sprite: 'leaf' },
   reversionBoss: { id: 'flame', color: '#ff9a59', glow: '#ffd26f', sprite: 'flame' },
+  skyDrake: { id: 'fireball', color: '#ff9a59', glow: '#ffd26f', sprite: 'fireball', zone: { id: 'fireWave', sprite: 'fireWave' } },
+  magmaTitan: { id: 'fireball', color: '#ff9a59', glow: '#ffd26f', sprite: 'fireball', zone: { id: 'fireRing', sprite: 'fireRing' } },
+  hornedBeast: { id: 'fireSpikes', color: '#ff9a59', glow: '#ffd26f', sprite: 'fireSpikes' },
+  lavaSerpent: { id: 'leaf', color: '#d9ed80', glow: '#f4ffc0', sprite: 'leaf', zone: { id: 'fireWave', sprite: 'fireWave' } },
+  emberImp: { id: 'fireSpikes', color: '#ffc067', glow: '#ffe8ac', sprite: 'fireSpikes' },
 };
 
 // Each boss alternates between two readable attack patterns. Keeping the
@@ -270,7 +292,25 @@ const BOSS_ATTACK_VARIANTS = {
   tideBoss: ['bubbleFan', 'tideRing'],
   groveBoss: ['leafFan', 'rootLattice'],
   reversionBoss: ['flamePulse', 'flameRain'],
+  skyDrake: ['dragonFan', 'dragonRain'],
+  magmaTitan: ['titanStomp', 'titanBoulder'],
+  hornedBeast: ['hornCharge', 'hornBurst'],
+  lavaSerpent: ['serpentFan', 'serpentLattice'],
+  emberImp: ['impFan', 'impBlink'],
 };
+
+const ENDLESS_BOSSES = ['reversionBoss', 'skyDrake', 'magmaTitan', 'hornedBeast', 'lavaSerpent', 'emberImp'];
+const ENDLESS_LEGACY_BOSSES = ['tideBoss', 'groveBoss'];
+const ENDLESS_ELITE_ACTIVE_CAP = 8;
+
+function endlessBossKinds(cycle, random = Math.random) {
+  return chooseUnique(ENDLESS_BOSSES, endlessBossCount(cycle), random);
+}
+
+function endlessEliteSpawnInterval(cycle) {
+  const round = Math.max(1, Math.floor(Number(cycle) || 1));
+  return Math.max(4.5, 10.5 - round * .3);
+}
 
 function bossAttackVariant(enemy) {
   const variants = BOSS_ATTACK_VARIANTS[enemy?.kind] || [];
@@ -279,7 +319,12 @@ function bossAttackVariant(enemy) {
 }
 
 function bossShotArt(enemy) {
-  return enemy?.boss ? BOSS_SHOT_ART[enemy.kind] || null : null;
+  return (enemy?.boss || enemy?.elite) ? BOSS_SHOT_ART[enemy.kind] || null : null;
+}
+
+function bossZoneArt(enemy) {
+  const art = bossShotArt(enemy);
+  return art?.zone || art;
 }
 
 function enemyStats(kind, hpScale = 1, damageScale = 1, speedScale = 1) {
@@ -305,10 +350,48 @@ const SPRITE_FRAMES = [
 ];
 
 const OBSTACLE_ART = {
-  shore: { source: './assets/shore-reef.webp?v=20260825-7', height: 2.35, floor: .56 },
-  forest: { source: './assets/forest-tree.webp?v=20260825-7', height: 3.25, floor: .78 },
-  volcano: { source: './assets/volcano-spire.webp?v=20260825-7', height: 3.5, floor: .72 },
+  shore: {
+    source: './assets/shore-reef.webp?v=20260825-7', height: 2.35, floor: .56,
+    variants: [
+      { source: './assets/shore-reef.webp?v=20260825-7', height: 2.35, floor: .56 },
+      { source: './assets/obstacle-coastal-reef-large.webp?v=20260831-2', height: 2.72, floor: .62, scale: 1.08 },
+    ],
+  },
+  forest: {
+    source: './assets/forest-tree.webp?v=20260825-7', height: 3.25, floor: .78,
+    variants: [
+      { source: './assets/forest-tree.webp?v=20260825-7', height: 3.25, floor: .78 },
+      { source: './assets/obstacle-fallen-root-detail.webp?v=20260831-2', height: 2.45, floor: .76, scale: 1.04 },
+      { source: './assets/obstacle-tree-stump-large.webp?v=20260831-2', height: 3.38, floor: .80, scale: 1.10 },
+    ],
+  },
+  volcano: {
+    source: './assets/volcano-spire.webp?v=20260825-7', height: 3.5, floor: .72,
+    variants: [
+      { source: './assets/volcano-spire.webp?v=20260825-7', height: 3.5, floor: .72 },
+      { source: './assets/obstacle-lava-spire-detail.webp?v=20260831-2', height: 3.62, floor: .72, scale: 1.03 },
+      { source: './assets/obstacle-lava-boulder-large.webp?v=20260831-2', height: 3.28, floor: .70, scale: 1.12 },
+      { source: './assets/obstacle-ruined-pillar-detail.webp?v=20260831-2', height: 3.42, floor: .74, scale: 1.04 },
+      { source: './assets/obstacle-ruin-gate-large.webp?v=20260831-2', height: 3.48, floor: .78, scale: 1.12 },
+    ],
+  },
 };
+
+function obstacleVariants(terrain) {
+  const art = OBSTACLE_ART[terrain];
+  return art?.variants || (art ? [art] : []);
+}
+
+function obstacleVariantIndex(obstacle, terrain) {
+  const variants = obstacleVariants(terrain);
+  if (!variants.length) return 0;
+  const seed = ((obstacle?.seed || 0) * 4) % 1;
+  return Math.min(variants.length - 1, Math.floor(seed * variants.length));
+}
+
+function obstacleVariantFor(obstacle, terrain) {
+  return obstacleVariants(terrain)[obstacleVariantIndex(obstacle, terrain)];
+}
 
 const RELIC_ART = {
   shore: { source: './assets/relic-tide-ruin.webp?v=20260828-1', size: 106 },
@@ -336,6 +419,11 @@ const ENEMY_ART = {
   tideBoss: { source: './assets/boss-tide-crab.webp?v=20260828-1', frame: [0, 0, 1254, 1254], scale: .070, size: 1.1 },
   groveBoss: { source: './assets/boss-ancient-warden.webp?v=20260828-1', frame: [0, 0, 1254, 1254], scale: .072, size: 1.1 },
   reversionBoss: { source: './assets/enemy-flame-ape.webp?v=20260827-1', frame: [23, 22, 1185, 1170], scale: .077, size: 1.15 },
+  skyDrake: { source: './assets/boss-sky-drake.webp?v=20260831-2', frame: [0, 0, 1254, 1254], scale: .070, size: 1.05 },
+  magmaTitan: { source: './assets/boss-magma-titan.webp?v=20260831-2', frame: [0, 0, 1254, 1254], scale: .068, size: 1.08 },
+  hornedBeast: { source: './assets/boss-horned-beast.webp?v=20260831-2', frame: [0, 0, 1254, 1254], scale: .066, size: 1.05 },
+  lavaSerpent: { source: './assets/boss-lava-serpent.webp?v=20260831-2', frame: [0, 0, 1254, 1254], scale: .062, size: 1.0 },
+  emberImp: { source: './assets/boss-ember-imp.webp?v=20260831-2', frame: [0, 0, 1254, 1254], scale: .060, size: .92 },
 };
 
 const FAN_HANDLE_ANGLE = 1.92;
@@ -344,17 +432,51 @@ const EFFECT_ART = {
   flame: { source: './assets/flame.webp?v=20260827-14', size: 28 },
   bubble: { source: './assets/boss-bubble.webp?v=20260828-1', size: 32 },
   leaf: { source: './assets/boss-leaf.webp?v=20260828-1', size: 34 },
+  fireSpikes: { source: './assets/boss-fire-spikes.webp?v=20260831-2', size: 58 },
+  fireball: { source: './assets/boss-fireball.webp?v=20260831-2', size: 58 },
+  fireWave: { source: './assets/boss-fire-wave.webp?v=20260831-2', width: 132, height: 88 },
+  fireRing: { source: './assets/boss-fire-ring.webp?v=20260831-2', size: 126 },
   venom: { source: './assets/venom.webp?v=20260827-14', width: 58, height: 42 },
   hurricane: { source: './assets/hurricane.webp?v=20260827-14', size: 46 },
 };
 
-// Only the current stage is required before play.  The following stage begins
-// loading during the current one, so its art is already decoded before it can appear.
-const STAGE_EFFECTS = [
-  ['fan', 'hurricane', 'bubble'],
-  ['leaf', 'venom'],
-  ['flame'],
+const BOSS_DEBUFFS = {
+  tideBoss: { name: '潮蚀', color: '#8fe7ef', duration: 2.4, slow: 1.8, damageTaken: 1.12 },
+  groveBoss: { name: '缚根', color: '#c6ec7c', duration: 2.2, slow: 2.4, root: .48, damageTaken: 1.08 },
+  reversionBoss: { name: '焦灼', color: '#ffad68', duration: 2, slow: .7, damageTaken: 1.06 },
+  skyDrake: { name: '龙焰', color: '#ff9a59', duration: 2.6, slow: .9, damageTaken: 1.08 },
+  magmaTitan: { name: '震裂', color: '#f2a05d', duration: 2.8, slow: 1.1, root: .35, damageTaken: 1.1 },
+  hornedBeast: { name: '裂伤', color: '#ffd06c', duration: 2.1, slow: .8, damageTaken: 1.16 },
+  lavaSerpent: { name: '毒鳞', color: '#d9ed80', duration: 2.4, slow: 1.4, damageTaken: 1.12 },
+  emberImp: { name: '余烬', color: '#ffc067', duration: 1.8, slow: .8, damageTaken: 1.08 },
+};
+
+const ENDLESS_BOSS_AFFIXES = [
+  { id: 'swift', name: '迅袭', color: '#ffd06c', speed: 1.16, skillRate: .84, damage: 1.05 },
+  { id: 'iron', name: '铁脊', color: '#c9d8e8', hp: 1.22, damage: 1.08, shield: .85 },
+  { id: 'blight', name: '腐化', color: '#d79af2', damage: 1.06, debuff: 1.35 },
 ];
+
+function bossDebuffFor(enemy) {
+  const base = (enemy?.boss || enemy?.elite) ? BOSS_DEBUFFS[enemy.kind] : null;
+  if (!base) return null;
+  const roundScale = 1 + Math.max(0, Number(enemy.endlessRound) || 0) * .10;
+  const affixScale = enemy.endlessAffix?.id === 'blight' ? enemy.endlessAffix.debuff : 1;
+  return {
+    ...base,
+    duration: base.duration * roundScale * affixScale,
+    slow: base.slow * roundScale * affixScale,
+    root: (base.root || 0) * roundScale * affixScale,
+    damageTaken: 1 + (base.damageTaken - 1) * roundScale * affixScale,
+  };
+}
+
+function endlessBossAffixFor(kind, cycle) {
+  const round = Math.max(0, Math.floor(Number(cycle) || 0));
+  if (round < 2) return null;
+  const bossIndex = [...ENDLESS_BOSSES, ...ENDLESS_LEGACY_BOSSES].indexOf(kind);
+  return ENDLESS_BOSS_AFFIXES[(bossIndex + round) % ENDLESS_BOSS_AFFIXES.length];
+}
 
 const HURRICANE_SPEED = 580;
 const HURRICANE_KNOCKBACK = 42;
@@ -388,6 +510,7 @@ function tuneBossStats(stats, cycle = 0) {
     skillEvery: Math.max(1.45, stats.skillEvery * (1 - rank * .1)),
     shots: (stats.shots || 1) + Math.min(6, Math.floor(rank / 2)),
     shotSpeed: stats.shotSpeed ? stats.shotSpeed * (1 + rank * .08) : stats.shotSpeed,
+    skillPower: stats.skillPower ? stats.skillPower * (1 + rank * .055) : stats.skillPower,
   };
   if (Number.isFinite(stats.skillRange)) tuned.skillRange = stats.skillRange * (1 + rank * .12);
   if (Number.isFinite(stats.skillRadius)) tuned.skillRadius = stats.skillRadius * (1 + rank * .12);
@@ -406,24 +529,44 @@ function orbitFanAngle(orbitAngle) {
   return orbitAngle + Math.PI - FAN_HANDLE_ANGLE;
 }
 
+function projectileMax(player) {
+  return 7 + Math.max(0, Math.floor(player?.projectileCapBonus || 0)) * 2;
+}
+
+function orbitMax(player) {
+  return 7 + Math.max(0, Math.floor(player?.orbitCapBonus || 0)) * 2;
+}
+
+function spikeMax(player) {
+  return 9 + Math.max(0, Math.floor(player?.spikeCapBonus || 0)) * 2;
+}
+
 const UPGRADES = [
   { id: 'hunterForm', icon: '◇', name: '猎手蜕变', text: '萌芽弹化为燧石弹：伤害 +5，穿透 +1', requires: p => p.growthStage === 0, apply: p => { p.growthStage = 1; p.damage += 5; p.pierce += 1; } },
   { id: 'fireForm', icon: '✹', name: '火种蜕变', text: '燧石弹化为火种弹：伤害 +8，攻速 +12%', requires: p => p.growthStage === 1, apply: p => { p.growthStage = 2; p.damage += 8; p.fireEvery = Math.max(.12, p.fireEvery * .88); } },
   { id: 'rapid', icon: '✦', name: '神经加速', text: '攻击间隔 -22%', apply: p => { p.fireEvery = Math.max(.12, p.fireEvery * .78); } },
   { id: 'power', icon: '✹', name: '骨刺投射', text: '基因弹伤害 +10', apply: p => { p.damage += 10; } },
-  { id: 'split', icon: '✧', name: '群体适应', text: '额外投射 2 枚基因弹', apply: p => { p.projectiles = Math.min(7, p.projectiles + 2); } },
+  { id: 'split', icon: '✧', name: '群体适应', text: '额外投射 2 枚基因弹', requires: p => p.projectiles < projectileMax(p), apply: p => { p.projectiles = Math.min(projectileMax(p), p.projectiles + 2); } },
   { id: 'stride', icon: '➜', name: '双足进化', text: '移动速度 +15%', apply: p => { p.speed *= 1.15; } },
   { id: 'vital', icon: '♥', name: '细胞修复', text: '生命上限 +30，并回复 30', apply: p => { p.maxHp += 30; p.hp = Math.min(p.maxHp, p.hp + 30); } },
   { id: 'pierce', icon: '↯', name: '穿透突变', text: '基因弹额外穿透 2 个敌人', apply: p => { p.pierce += 2; } },
   { id: 'magnet', icon: '◉', name: '群落感知', text: '样本拾取范围 +35%', apply: p => { p.magnet *= 1.35; } },
-  { id: 'nova', icon: '☀', name: '演化脉冲', text: '脉冲冷却 -1.8 秒', apply: p => { p.novaMax = Math.max(3.5, p.novaMax - 1.8); } },
-  { id: 'spikes', icon: '⌁', name: '石矛增生', text: '扇形石矛 +3，伤害 +8', apply: p => { p.spikeCount = Math.min(9, p.spikeCount + 3); p.spikeDamage += 8; } },
+  { id: 'nova', icon: '☀', name: '演化脉冲', text: '范围、伤害、免疫时间增加，冷却 -1.8 秒', apply: p => { p.novaLevel += 1; p.novaMax = Math.max(3.5, p.novaMax - 1.8); } },
+  { id: 'spikes', icon: '⌁', name: '石矛增生', text: '扇形石矛 +3，伤害 +8', requires: p => p.spikeCount < spikeMax(p), apply: p => { p.spikeCount = Math.min(spikeMax(p), p.spikeCount + 3); p.spikeDamage += 8; } },
   { id: 'spikeRapid', icon: '➹', name: '投矛熟练', text: '石矛齐射间隔 -0.45 秒', apply: p => { p.spikeEvery = Math.max(.85, p.spikeEvery - .45); } },
-  { id: 'orbit', icon: '◌', name: '祖灵扇阵', text: '新增两枚环绕扇子，伤害 +8，攻击更快', requires: p => p.orbitCount < 7, apply: p => { p.orbitCount = Math.min(7, p.orbitCount + 2); p.orbitDamage += 8; p.orbitEvery = Math.max(.18, p.orbitEvery - .06); } },
+  { id: 'orbit', icon: '◌', name: '祖灵扇阵', text: '新增两枚环绕扇子，伤害 +8，攻击更快', requires: p => p.orbitCount < orbitMax(p), apply: p => { p.orbitCount = Math.min(orbitMax(p), p.orbitCount + 2); p.orbitDamage += 8; p.orbitEvery = Math.max(.18, p.orbitEvery - .06); } },
   { id: 'chain', icon: 'ϟ', name: '雷群感应', text: '学习连锁电弧：自动跳跃攻击 2 个目标', requires: p => !p.chainLevel, apply: p => { p.chainLevel = 1; p.chainTimer = .2; } },
   { id: 'chainPlus', icon: 'ϟ', name: '电弧增幅', text: '连锁电弧额外跳跃 2 次，伤害 +9', requires: p => p.chainLevel > 0 && p.chainLevel < 3, apply: p => { p.chainLevel = Math.min(3, p.chainLevel + 2); p.chainDamage += 9; p.chainEvery = Math.max(1.1, p.chainEvery - .4); } },
   { id: 'wheel', icon: '◈', name: '旋骨飞轮', text: '学习旋骨飞轮：沿面向穿透敌人', requires: p => !p.wheelLevel, apply: p => { p.wheelLevel = 1; p.wheelTimer = .3; } },
   { id: 'wheelPlus', icon: '◈', name: '飞轮淬炼', text: '旋骨飞轮伤害 +9，穿透 +2，发射更快', requires: p => p.wheelLevel > 0 && p.wheelLevel < 3, apply: p => { p.wheelLevel = Math.min(3, p.wheelLevel + 2); p.wheelDamage += 9; p.wheelEvery = Math.max(1.2, p.wheelEvery - .5); } },
+];
+
+const ENDLESS_REWARDS = [
+  { icon: '✹', name: '猎王之火', text: '伤害 +9，攻击间隔 -6%', apply: p => { p.damage += 9; p.fireEvery = Math.max(.12, p.fireEvery * .94); } },
+  { icon: '♥', name: '巨兽血脉', text: '生命上限 +45，并回复 45 点', apply: p => { p.maxHp += 45; p.hp = Math.min(p.maxHp, p.hp + 45); } },
+  { icon: '➜', name: '逐风骨骼', text: '移动速度 +14%，所有主动技能立即就绪', apply: p => { p.speed *= 1.14; p.dashCooldown = 0; p.spearCooldown = 0; p.wardCooldown = 0; } },
+  { icon: 'ϟ', name: '回响心核', text: '连锁/飞轮更快；脉冲冷却 -1.2 秒', apply: p => { p.chainEvery = Math.max(1.1, p.chainEvery * .86); p.wheelEvery = Math.max(1.2, p.wheelEvery * .86); p.novaMax = Math.max(3.5, p.novaMax - 1.2); } },
+  { icon: '◈', name: '裂阵武装', text: '额外投射 +1，穿透 +1', apply: p => { p.projectiles = Math.min(projectileMax(p), p.projectiles + 1); p.pierce += 1; } },
 ];
 
 const PICKUPS = {
@@ -533,9 +676,10 @@ function bossBarVisible(boss) {
   return Boolean(boss?.boss && !boss.dead && boss.hp > 0 && boss.maxHp > 0);
 }
 
-function bossBarLayout(width, height) {
+function bossBarLayout(width, height, index = 0, count = 1) {
   const barWidth = Math.min(440, Math.max(180, width - 54));
-  return { x: (width - barWidth) / 2, y: Math.min(120, Math.max(106, Math.round(height * .17))), width: barWidth };
+  const baseY = Math.min(120, Math.max(106, Math.round(height * .17)));
+  return { x: (width - barWidth) / 2, y: baseY + (count > 1 ? index * 47 : 0), width: barWidth };
 }
 
 function bossArrowLayout(width, height, boss, camera = { x: 0, y: 0 }) {
@@ -616,6 +760,40 @@ function createMusicLoop(context, stage = 0) {
   return buffer;
 }
 
+function assetSourceCandidates(source) {
+  const primary = String(source || '');
+  if (!primary) return [];
+  const pngFallback = primary.replace(/\.webp(?=([?#]|$))/i, '.png');
+  return pngFallback === primary ? [primary] : [primary, pngFallback];
+}
+
+function loadImageWithFallback(image, source, onLoad, onFailure) {
+  const sources = assetSourceCandidates(source);
+  if (!sources.length) {
+    onFailure();
+    return;
+  }
+  let sourceIndex = 0;
+  const nextSource = () => { image.src = sources[sourceIndex++]; };
+  const handleError = () => {
+    if (sourceIndex < sources.length) {
+      nextSource();
+      return;
+    }
+    image.removeEventListener('error', handleError);
+    image.removeEventListener('load', handleLoad);
+    onFailure();
+  };
+  const handleLoad = () => {
+    image.removeEventListener('error', handleError);
+    onLoad();
+  };
+  image.decoding = 'async';
+  image.addEventListener('load', handleLoad, { once: true });
+  image.addEventListener('error', handleError);
+  nextSource();
+}
+
 class Game {
   constructor(canvas, dom) {
     this.canvas = canvas;
@@ -639,28 +817,30 @@ class Game {
     this.musicSource = null;
     this.musicSourceGain = null;
     this.musicStage = -1;
-    this.portraitFallback = false;
     this.initialAssetsReady = false;
     this.stagePreloads = [];
     this.sprite = new Image();
     this.spriteReady = false;
     this.spritePromise = new Promise(resolve => {
-      this.sprite.addEventListener('load', () => { this.spriteReady = true; resolve(); }, { once: true });
-      this.sprite.addEventListener('error', () => { console.warn('贴图加载失败：evolution-guide.webp'); resolve(); }, { once: true });
+      loadImageWithFallback(
+        this.sprite,
+        './assets/evolution-guide.webp?v=20260825-3',
+        () => { this.spriteReady = true; resolve(); },
+        () => { console.warn('贴图加载失败：evolution-guide.webp / evolution-guide.png'); resolve(); },
+      );
     });
-    this.sprite.src = './assets/evolution-guide.webp?v=20260825-3';
     this.enemySprites = {};
     this.obstacleSprites = {};
     this.relicSprites = {};
     this.effectSprites = {};
     this.preloadStage(0).then(() => {
       this.initialAssetsReady = true;
-      this.dom.assetStatus.textContent = '第一阶段贴图已在后台就绪';
+      this.dom.assetStatus.textContent = '基础贴图已在后台就绪';
     });
     this.resize();
     this.bindInput();
     window.addEventListener('resize', () => this.resize());
-    window.addEventListener('orientationchange', () => this.syncOrientationLayout());
+    window.addEventListener('orientationchange', () => requestAnimationFrame(() => this.resize()));
     document.addEventListener('fullscreenchange', () => this.syncOrientationLayout());
     requestAnimationFrame(time => this.frame(time));
   }
@@ -669,15 +849,16 @@ class Game {
     if (store[key] || !art) return store[key];
     const image = new Image();
     const sprite = { image, ready: false, failed: false, ...art };
-    sprite.promise = new Promise(resolve => {
-      image.addEventListener('load', () => { sprite.ready = true; resolve(sprite); }, { once: true });
-      image.addEventListener('error', () => {
+    sprite.promise = new Promise(resolve => loadImageWithFallback(
+      image,
+      art.source,
+      () => { sprite.ready = true; resolve(sprite); },
+      () => {
         sprite.failed = true;
         console.warn(`贴图加载失败：${art.source}`);
         resolve(sprite);
-      }, { once: true });
-    });
-    image.src = art.source;
+      },
+    ));
     store[key] = sprite;
     return sprite;
   }
@@ -690,11 +871,15 @@ class Game {
     return this.loadSprite(this.effectSprites, kind, EFFECT_ART[kind]);
   }
 
+  loadObstacleSprite(terrain, index = 0) {
+    return this.loadSprite(this.obstacleSprites, `${terrain}:${index}`, obstacleVariants(terrain)[index]);
+  }
+
   loadBiomeSprites(index) {
     const biome = BIOMES[index];
     if (!biome) return;
-    biome.enemies.forEach(kind => this.loadEnemySprite(kind));
-    this.loadSprite(this.obstacleSprites, biome.terrain, OBSTACLE_ART[biome.terrain]);
+    this.loadEnemySprite(biome.enemies[0]);
+    this.loadObstacleSprite(biome.terrain);
     this.loadSprite(this.relicSprites, biome.terrain, RELIC_ART[biome.terrain]);
   }
 
@@ -703,11 +888,9 @@ class Game {
     const biome = BIOMES[index];
     if (!biome) return Promise.resolve();
     const sprites = [
-      ...biome.enemies.map(kind => this.loadEnemySprite(kind)),
-      this.loadEnemySprite(biome.boss),
-      this.loadSprite(this.obstacleSprites, biome.terrain, OBSTACLE_ART[biome.terrain]),
+      this.loadEnemySprite(biome.enemies[0]),
+      this.loadObstacleSprite(biome.terrain),
       this.loadSprite(this.relicSprites, biome.terrain, RELIC_ART[biome.terrain]),
-      ...STAGE_EFFECTS[index].map(kind => this.loadEffectSprite(kind)),
     ];
     if (index === 0) sprites.push({ promise: this.spritePromise });
     const preload = Promise.all(sprites.filter(Boolean).map(sprite => sprite.promise || Promise.resolve(sprite))).then(() => index);
@@ -716,17 +899,37 @@ class Game {
   }
 
   startMusic() {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    if (!this.musicContext || this.musicContext.state === 'closed') {
-      this.musicContext = new AudioContext();
-      this.musicGain = this.musicContext.createGain();
-      this.musicGain.gain.value = MUSIC_GAIN;
-      this.musicGain.connect(this.musicContext.destination);
-      this.musicBuffers = MUSIC_STAGES.map((_, stage) => createMusicLoop(this.musicContext, stage));
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      if (!this.musicContext || this.musicContext.state === 'closed') {
+        this.musicContext = new AudioContext();
+        this.musicGain = this.musicContext.createGain();
+        this.musicGain.gain.value = MUSIC_GAIN;
+        this.musicGain.connect(this.musicContext.destination);
+        // ponytail: decode only the active variation; generate the rest when the biome changes.
+        this.musicBuffers = [];
+      }
+      const resume = this.musicContext.resume?.();
+      if (resume?.catch) void resume.catch(() => {});
+      const stage = musicStageFor(this.biomeIndex || 0, this.boss);
+      setTimeout(() => {
+        if (!this.musicContext || this.state !== 'playing') return;
+        try {
+          this.setMusicStage(stage);
+        } catch (error) {
+          console.warn('音乐变奏加载失败，继续无声游戏：', error);
+          this.musicContext = null;
+          this.musicGain = null;
+          this.musicBuffers = null;
+        }
+      }, 0);
+    } catch (error) {
+      console.warn('音频初始化失败，继续无声游戏：', error);
+      this.musicContext = null;
+      this.musicGain = null;
+      this.musicBuffers = null;
     }
-    void this.musicContext.resume().catch(() => {});
-    this.setMusicStage(musicStageFor(this.biomeIndex || 0, this.boss));
   }
 
   setMusicStage(stage) {
@@ -797,9 +1000,12 @@ class Game {
     this.spawnTimer = .7 / this.difficulty.spawnRate;
     this.bossSpawned = false;
     this.boss = null;
+    this.bosses = [];
     this.bossDefeated = 0;
     this.endless = false;
     this.endlessCycle = 0;
+    this.eliteTimer = 0;
+    this.eliteSpawned = 0;
     this.biomeIndex = 0;
     this.loadBiomeSprites(this.biomeIndex);
     this.stageTime = 0;
@@ -821,9 +1027,11 @@ class Game {
       spikeEvery: 2.18, spikeTimer: .8, spikeCount: 3, spikeDamage: 16,
       growthStage: 0, orbitCount: 1, orbitDamage: 14, orbitEvery: .36, orbitTimer: .16,
       vampireLevel: 0, vampireTimer: 0, rageRune: 0, shellRune: 0, windRune: 0, echoRune: 0, runeCapBonus: 0, skillCapBonus: 0,
+      projectileCapBonus: 0, orbitCapBonus: 0, spikeCapBonus: 0,
       chainLevel: 0, chainEvery: 2.45, chainTimer: .4, chainDamage: 25,
       wheelLevel: 0, wheelEvery: 2.8, wheelTimer: .6, wheelDamage: 24,
-      invuln: 0, hitInvuln: this.difficulty.hitInvuln, nova: 0, novaMax: 9, flash: 0, hitPulse: 0, slow: 0, haste: 0,
+      invuln: 0, hitInvuln: this.difficulty.hitInvuln, nova: 0, novaMax: 9, novaLevel: 0, debuffImmune: 0, flash: 0, hitPulse: 0, slow: 0, haste: 0, root: 0,
+      burn: 0, burnTimer: 0, burnDamage: 0, debuff: 0, debuffName: '', debuffColor: '#fff', sunder: 0, sunderMultiplier: 1,
       dashCooldown: 0, dashTime: 0, dashAngle: 0, dashLevel: 0,
       spearCooldown: 0, spearLevel: 0,
       wardCooldown: 0, ward: 0, wardLevel: 0,
@@ -842,7 +1050,9 @@ class Game {
   }
 
   start(difficultyId) {
-    this.enterLandscape();
+    if (!this.isMobileDevice()) {
+      try { this.enterDesktopFullscreen(); } catch (error) { console.warn('桌面全屏不可用，继续进入游戏：', error); }
+    }
     this.reset(difficultyId);
     void this.preloadStage(1);
     this.startMusic();
@@ -851,66 +1061,28 @@ class Game {
     this.dom.upgrade.hidden = true;
   }
 
-  enterLandscape() {
+  isMobileDevice() {
+    return window.matchMedia?.('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod|Mobile/i.test(globalThis.navigator?.userAgent || '');
+  }
+
+  enterDesktopFullscreen() {
     const container = this.canvas.parentElement;
     const fullscreenTarget = [container, document.documentElement].find(target => target?.requestFullscreen || target?.webkitRequestFullscreen || target?.webkitRequestFullScreen);
     const requestFullscreen = fullscreenTarget?.requestFullscreen || fullscreenTarget?.webkitRequestFullscreen || fullscreenTarget?.webkitRequestFullScreen;
-    const lock = async () => {
-      const orientation = globalThis.screen?.orientation;
-      if (!orientation?.lock) return false;
-      for (const mode of ['landscape-primary', 'landscape']) {
-        try {
-          await orientation.lock(mode);
-          return true;
-        } catch {
-          // Some browsers accept only one of the two landscape tokens.
-        }
-      }
-      return false;
-    };
-    const fallback = () => {
-      if (this.isPortraitViewport()) this.setPortraitFallback(true);
-    };
-    const lockOrFallback = async () => {
-      const locked = await lock();
-      if (!locked && this.isPortraitViewport()) fallback();
-    };
     if (document.fullscreenElement) {
-      void lockOrFallback();
       return;
     }
-    if (!requestFullscreen) {
-      void lockOrFallback();
-      return;
-    }
+    if (!requestFullscreen) return;
     try {
-      const request = requestFullscreen.call(fullscreenTarget, { navigationUI: 'hide' });
-      void Promise.resolve(request).then(lockOrFallback).catch(lockOrFallback);
-    } catch {
-      void lockOrFallback();
+      const request = requestFullscreen.call(fullscreenTarget);
+      if (request?.catch) void request.catch(() => {});
+    } catch (error) {
+      console.warn('桌面全屏请求失败，继续进入游戏：', error);
     }
-  }
-
-  isPortraitViewport() {
-    return window.matchMedia?.('(orientation: portrait)').matches ?? this.width < this.height;
-  }
-
-  setPortraitFallback(enabled) {
-    const next = Boolean(enabled && this.isPortraitViewport());
-    if (next === this.portraitFallback) return;
-    this.portraitFallback = next;
-    document.body.classList.toggle('portrait-fallback', next);
-    this.resize();
   }
 
   syncOrientationLayout() {
-    if (!this.isPortraitViewport() && this.portraitFallback) {
-      this.portraitFallback = false;
-      document.body.classList.remove('portrait-fallback');
-      this.resize();
-    } else if (this.portraitFallback) {
-      this.resize();
-    }
+    this.resize();
   }
 
   showDifficulty() {
@@ -932,8 +1104,8 @@ class Game {
 
   resize() {
     const rect = this.canvas.getBoundingClientRect();
-    this.width = Math.max(1, this.portraitFallback ? rect.height : rect.width);
-    this.height = Math.max(1, this.portraitFallback ? rect.width : rect.height);
+    this.width = Math.max(1, rect.width);
+    this.height = Math.max(1, rect.height);
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(this.width * this.dpr);
     this.canvas.height = Math.round(this.height * this.dpr);
@@ -945,20 +1117,41 @@ class Game {
     this.camera = cameraFromPlayer(this.player, this.width, this.height);
   }
 
-  moveAgainstTerrain(body, dx, dy, radius, canFly = false) {
-    // ponytail: axis-only sliding avoids pathfinding; add navigation only for maze-like obstacle layouts.
-    if (canFly) {
-      body.x += dx;
-      body.y += dy;
-      return;
-    }
-    if (!hitsObstacle(body.x + dx, body.y, radius)) body.x += dx;
-    if (!hitsObstacle(body.x, body.y + dy, radius)) body.y += dy;
+  activeBosses() {
+    return (this.bosses || []).filter(boss => !boss.dead && boss.hp > 0);
+  }
+
+  moveAgainstTerrain(body, dx, dy, radius) {
+    // ponytail: local steering avoids a pathfinding graph; every ground step still checks the obstacle.
+    const distance = Math.hypot(dx, dy);
+    if (!distance) return false;
+    const steps = Math.max(1, Math.ceil(distance / Math.max(4, radius * .55)));
+    const stepX = dx / steps;
+    const stepY = dy / steps;
+    const tryStep = (nextX, nextY) => {
+      let moved = false;
+      if (nextX && !hitsObstacle(body.x + nextX, body.y, radius)) { body.x += nextX; moved = true; }
+      if (nextY && !hitsObstacle(body.x, body.y + nextY, radius)) { body.y += nextY; moved = true; }
+      if (moved) return true;
+      for (const angle of [Math.PI / 2, -Math.PI / 2, Math.PI / 4, -Math.PI / 4, Math.PI * .75, -Math.PI * .75]) {
+        const sidestepX = Math.cos(angle) * nextX - Math.sin(angle) * nextY;
+        const sidestepY = Math.sin(angle) * nextX + Math.cos(angle) * nextY;
+        if (!hitsObstacle(body.x + sidestepX, body.y + sidestepY, radius)) {
+          body.x += sidestepX;
+          body.y += sidestepY;
+          return true;
+        }
+      }
+      return false;
+    };
+    for (let step = 0; step < steps; step += 1) if (!tryStep(stepX, stepY)) return step > 0;
+    return true;
   }
 
   makeEnemy(stats, position, kind, boss = false) {
     return {
-      ...stats, ...position, kind, boss, hit: 0, attack: 0,
+      ...stats, ...position, kind, boss, elite: Boolean(stats.elite), role: boss ? 'boss' : stats.elite ? 'elite' : 'small', hit: 0, attack: 0,
+      attackEvery: (boss || stats.elite) ? Math.max(.32, .75 / (1 + Math.max(0, Number(stats.endlessCycle) || 0) * .08)) : .75,
       skillTimer: .5 + Math.random() * stats.skillEvery,
       dash: 0, dashAngle: 0, windup: 0, shield: 0, enraged: false, phase: Math.random() * TAU, facing: 4, flipX: false, phaseTwo: false, bossPattern: 0,
     };
@@ -979,9 +1172,7 @@ class Game {
       const rect = this.canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-      // CSS rotation fallback presents a landscape canvas inside a portrait
-      // viewport; map screen coordinates back into its logical orientation.
-      return this.portraitFallback ? { x: y, y: rect.width - x } : { x, y };
+      return { x, y };
     };
     const joystickOffset = event => {
       const rect = this.dom.joystick.getBoundingClientRect();
@@ -990,7 +1181,12 @@ class Game {
     const updateJoystick = event => {
       const offset = joystickOffset(event);
       const vector = joystickVector(offset.x, offset.y);
-      this.joystick = { id: event.pointerId, ...vector };
+      if (!this.joystick || this.joystick.id !== event.pointerId) {
+        this.joystick = { id: event.pointerId, x: vector.x, y: vector.y, targetX: vector.x, targetY: vector.y };
+      } else {
+        this.joystick.targetX = vector.x;
+        this.joystick.targetY = vector.y;
+      }
       this.dom.joystickKnob.style.transform = `translate(${vector.x * JOYSTICK_MAX}px, ${vector.y * JOYSTICK_MAX}px)`;
     };
     const releaseJoystick = event => {
@@ -1047,13 +1243,24 @@ class Game {
 
   spawnEnemy() {
     // ponytail: bound active enemies for mobile; raise the cap only after profiling a denser encounter.
-    if (this.enemies.length >= 45) return;
+    if (this.enemies.filter(enemy => !enemy.dead && !enemy.elite && !enemy.boss).length >= 45) return;
     const difficulty = 1 + this.time * .0085;
     const endless = endlessMultiplier(this.endlessCycle);
     const biome = BIOMES[this.biomeIndex];
-    const kind = biome.enemies[Math.floor(Math.random() * biome.enemies.length)];
+    const spawnKinds = biome.enemies;
+    const kind = spawnKinds[Math.floor(Math.random() * spawnKinds.length)];
     this.loadEnemySprite(kind);
-    const s = enemyStats(kind, difficulty * this.difficulty.hp * endless, this.difficulty.damage * (1 + this.time * .0015) * endless, this.difficulty.speed * (1 + this.time * .00055) * (1 + Math.max(0, this.endlessCycle) * .065));
+    const hpScale = difficulty * this.difficulty.hp * endless;
+    const damageScale = this.difficulty.damage * (1 + this.time * .0015) * endless;
+    const speedScale = this.difficulty.speed * (1 + this.time * .00055) * (1 + Math.max(0, this.endlessCycle) * .065);
+    const s = enemyStats(kind, hpScale, damageScale, speedScale);
+    if (this.endless) {
+      s.endlessCycle = this.endlessCycle;
+      s.skillLevel = Math.min(3, Math.floor((this.endlessCycle + 1) / 2));
+      s.skillEvery = Math.max(.9, s.skillEvery * (1 - s.skillLevel * .08));
+      if (Number.isFinite(s.shotSpeed)) s.shotSpeed *= 1 + s.skillLevel * .06;
+      if (Number.isFinite(s.shots)) s.shots += Math.floor(s.skillLevel / 2);
+    }
     const margin = s.radius + 72;
     let p;
     for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -1067,22 +1274,96 @@ class Game {
     this.enemies.push(this.makeEnemy(s, p, kind));
   }
 
-  spawnBoss() {
-    const kind = BIOMES[this.biomeIndex].boss;
+  spawnElite() {
+    if (!this.endless) return;
+    const activeElites = this.enemies.filter(enemy => enemy.elite && !enemy.dead && enemy.hp > 0);
+    if (activeElites.length >= ENDLESS_ELITE_ACTIVE_CAP) return;
+    const kind = ENDLESS_LEGACY_BOSSES[(this.eliteSpawned + this.endlessCycle - 1) % ENDLESS_LEGACY_BOSSES.length];
+    this.eliteSpawned += 1;
+    const affix = endlessBossAffixFor(kind, this.endlessCycle);
     this.loadEnemySprite(kind);
     this.loadEffectSprite(BOSS_SHOT_ART[kind]?.sprite);
     const endless = endlessMultiplier(this.endlessCycle);
-    const s = tuneBossStats(enemyStats(kind, (1 + this.time * .0055) * this.difficulty.hp * endless, this.difficulty.damage * (1 + this.time * .0015) * endless, this.difficulty.speed * (1 + this.time * .00055) * (1 + Math.max(0, this.endlessCycle) * .065)), this.endlessCycle);
+    const round = Math.max(1, this.endlessCycle);
+    const eliteGrowth = 1 + round * .08;
+    const s = tuneBossStats(
+      enemyStats(
+        kind,
+        (1 + this.time * .0055) * this.difficulty.hp * endless * .72 * eliteGrowth,
+        this.difficulty.damage * (1 + this.time * .0015) * endless * .84 * (1 + round * .045),
+        this.difficulty.speed * (1 + this.time * .00055) * (1 + Math.max(0, this.endlessCycle) * .065) * (1 + round * .025),
+      ),
+      this.endlessCycle,
+    );
+    s.shots = Math.max(3, Math.ceil((s.shots || 1) * .68));
+    if (affix?.hp) {
+      s.hp = Math.round(s.hp * affix.hp);
+      s.maxHp = s.hp;
+    }
+    if (affix?.damage) s.damage = Math.max(1, Math.round(s.damage * affix.damage));
+    if (affix?.speed) s.speed *= affix.speed;
+    if (affix?.skillRate) s.skillEvery = Math.max(.95, s.skillEvery * affix.skillRate);
+    s.elite = true;
     s.endlessCycle = this.endlessCycle;
-    let x = this.player.x;
-    const y = this.player.y - Math.max(this.width, this.height) * .7;
-    for (let attempt = 0; attempt < 6 && hitsObstacle(x, y, s.radius + 4); attempt += 1) x += OBSTACLE_TILE * .45;
-    this.boss = this.makeEnemy(s, { x, y }, kind, true);
-    this.boss.biomeIndex = this.biomeIndex;
-    this.enemies.push(this.boss);
+    s.endlessAffix = affix;
+    const margin = s.radius + 96;
+    let p;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const side = Math.floor(Math.random() * 4);
+      p = side === 0 ? { x: this.camera.x + Math.random() * this.width, y: this.camera.y - margin }
+        : side === 1 ? { x: this.camera.x + this.width + margin, y: this.camera.y + Math.random() * this.height }
+          : side === 2 ? { x: this.camera.x + Math.random() * this.width, y: this.camera.y + this.height + margin }
+            : { x: this.camera.x - margin, y: this.camera.y + Math.random() * this.height };
+      if (!hitsObstacle(p.x, p.y, s.radius + 4)) break;
+    }
+    const elite = this.makeEnemy(s, p, kind);
+    if (affix?.shield) elite.shield = affix.shield;
+    if (affix?.skillRate) elite.attackEvery = Math.max(.28, elite.attackEvery * affix.skillRate);
+    elite.biomeIndex = this.biomeIndex;
+    elite.endlessRound = this.endlessCycle;
+    this.enemies.push(elite);
+    this.rings.push({ x: elite.x, y: elite.y, radius: 4, max: Math.max(this.width, this.height), life: 1.1, color: BOSS_DEBUFFS[kind]?.color || '#ffd06c' });
+  }
+
+  spawnBoss() {
+    const kinds = this.endless ? endlessBossKinds(this.endlessCycle) : [BIOMES[this.biomeIndex].boss];
+    const endless = endlessMultiplier(this.endlessCycle);
+    this.bosses = [];
+    for (let index = 0; index < kinds.length; index += 1) {
+      const kind = kinds[index];
+      const affix = this.endless ? endlessBossAffixFor(kind, this.endlessCycle) : null;
+      this.loadEnemySprite(kind);
+      this.loadEffectSprite(BOSS_SHOT_ART[kind]?.sprite);
+      const s = tuneBossStats(enemyStats(kind, (1 + this.time * .0055) * this.difficulty.hp * endless, this.difficulty.damage * (1 + this.time * .0015) * endless, this.difficulty.speed * (1 + this.time * .00055) * (1 + Math.max(0, this.endlessCycle) * .065)), this.endlessCycle);
+      if (affix?.hp) {
+        s.hp = Math.round(s.hp * affix.hp);
+        s.maxHp = s.hp;
+      }
+      if (affix?.damage) s.damage = Math.max(1, Math.round(s.damage * affix.damage));
+      if (affix?.speed) s.speed *= affix.speed;
+      if (affix?.skillRate) s.skillEvery = Math.max(1.1, s.skillEvery * affix.skillRate);
+      s.endlessCycle = this.endlessCycle;
+      s.endlessAffix = affix;
+      const angle = kinds.length === 2 ? -Math.PI / 2 + (index ? .95 : -.95) : -Math.PI / 2;
+      const distance = Math.max(this.width, this.height) * .7;
+      let x = this.player.x + Math.cos(angle) * distance;
+      let y = this.player.y + Math.sin(angle) * distance;
+      for (let attempt = 0; attempt < 6 && hitsObstacle(x, y, s.radius + 4); attempt += 1) {
+        x += OBSTACLE_TILE * .45;
+        y += OBSTACLE_TILE * .18;
+      }
+      const boss = this.makeEnemy(s, { x, y }, kind, true);
+      if (affix?.shield) boss.shield = affix.shield;
+      if (affix?.skillRate) boss.attackEvery = Math.max(.28, boss.attackEvery * affix.skillRate);
+      boss.biomeIndex = this.biomeIndex;
+      boss.endlessRound = this.endlessCycle;
+      this.bosses.push(boss);
+      this.enemies.push(boss);
+      this.rings.push({ x: boss.x, y: boss.y, radius: 4, max: Math.max(this.width, this.height), life: 1.1, color: '#ed7180' });
+    }
+    this.boss = this.bosses[0] || null;
     this.bossSpawned = true;
     this.setMusicStage(musicStageFor(this.biomeIndex, this.boss));
-    this.rings.push({ x: this.boss.x, y: this.boss.y, radius: 4, max: Math.max(this.width, this.height), life: 1.1, color: '#ed7180' });
   }
 
   update(dt) {
@@ -1097,6 +1378,22 @@ class Game {
     p.nova = Math.max(0, p.nova - dt);
     p.slow = Math.max(0, p.slow - dt);
     p.haste = Math.max(0, p.haste - dt);
+    p.root = Math.max(0, p.root - dt);
+    p.debuffImmune = Math.max(0, p.debuffImmune - dt);
+    p.debuff = Math.max(0, p.debuff - dt);
+    p.sunder = Math.max(0, p.sunder - dt);
+    if (p.debuff <= 0) p.debuffName = '';
+    if (p.sunder <= 0) p.sunderMultiplier = 1;
+    p.burn = Math.max(0, p.burn - dt);
+    p.burnTimer -= dt;
+    if (p.burn <= 0) {
+      p.burnDamage = 0;
+      p.burnTimer = 0;
+    } else if (p.burnTimer <= 0) {
+      p.burnTimer += .72;
+      this.hurtPlayer(p.burnDamage);
+      if (this.state !== 'playing') return;
+    }
     p.vampireTimer = Math.max(0, p.vampireTimer - dt);
     p.dashCooldown = Math.max(0, p.dashCooldown - dt);
     p.dashTime = Math.max(0, p.dashTime - dt);
@@ -1141,11 +1438,18 @@ class Game {
         this.spawnTimer += spawnInterval(this.time, this.difficulty, this.endlessCycle);
       }
       if (this.stageTime >= BOSS_TIME) this.spawnBoss();
-    } else if (this.boss && this.boss.hp > 0) {
+    } else if (this.bosses.some(boss => !boss.dead && boss.hp > 0)) {
       this.spawnTimer -= dt;
       if (this.spawnTimer <= 0) {
         for (let count = 0; count < endlessSpawnCount(this.endlessCycle); count += 1) this.spawnEnemy();
         this.spawnTimer += bossSpawnInterval(this.difficulty, this.endlessCycle);
+      }
+    }
+    if (this.endless) {
+      this.eliteTimer -= dt;
+      if (this.eliteTimer <= 0) {
+        this.spawnElite();
+        this.eliteTimer += endlessEliteSpawnInterval(this.endlessCycle);
       }
     }
     this.updateBuildings(dt);
@@ -1172,6 +1476,9 @@ class Game {
     let dx = (this.keys.has('d') || this.keys.has('arrowright') ? 1 : 0) - (this.keys.has('a') || this.keys.has('arrowleft') ? 1 : 0);
     let dy = (this.keys.has('s') || this.keys.has('arrowdown') ? 1 : 0) - (this.keys.has('w') || this.keys.has('arrowup') ? 1 : 0);
     if (this.joystick) {
+      const follow = 1 - Math.exp(-dt * 28);
+      this.joystick.x += (this.joystick.targetX - this.joystick.x) * follow;
+      this.joystick.y += (this.joystick.targetY - this.joystick.y) * follow;
       dx = this.joystick.x;
       dy = this.joystick.y;
     } else if (this.pointer) {
@@ -1180,7 +1487,7 @@ class Game {
     }
     const length = Math.hypot(dx, dy);
     if (length > (this.joystick ? .08 : .5)) {
-      const speed = p.speed * (p.slow > 0 ? .65 : 1) * (p.haste > 0 ? 1.3 : 1) * (1 + p.windRune * .03);
+      const speed = p.speed * (p.root > 0 ? 0 : p.slow > 0 ? .65 : 1) * (p.haste > 0 ? 1.3 : 1) * (1 + p.windRune * .03);
       const pace = this.joystick ? speed * dt * Math.min(1, length) : Math.min(speed * dt, this.pointer ? length : speed * dt);
       this.moveAgainstTerrain(p, dx / length * pace, dy / length * pace, p.r);
       p.facing = directionFrame(dx, dy);
@@ -1326,8 +1633,8 @@ class Game {
         if (e.dead || b.hits.has(e) || Math.hypot(e.x - b.x, e.y - b.y) > e.radius + b.r) continue;
         this.damageEnemy(e, b.damage);
         if (this.state !== 'playing') return;
-        const push = b.kind === 'hurricane' && !e.dead ? hurricaneKnockback(b.vx, b.vy, e.boss) : null;
-        if (push) this.moveAgainstTerrain(e, push.x, push.y, e.radius, e.canFly);
+        const push = b.kind === 'hurricane' && !e.dead ? hurricaneKnockback(b.vx, b.vy, e.boss || e.elite) : null;
+        if (push) this.moveAgainstTerrain(e, push.x, push.y, e.radius);
         b.hits.add(e);
         if (b.pierce > 0) b.pierce -= 1;
         else removed = true;
@@ -1353,7 +1660,7 @@ class Game {
     if (vampireHealed > 0) this.player.vampireTimer = .25;
     if (vampireHealed > 0) this.particles.push({ x: this.player.x, y: this.player.y - 22, vx: 0, vy: -18, life: .22, max: .22, color: '#f09ab3', size: 2.5 });
     enemy.hit = .15;
-    this.particles.push(...Array.from({ length: enemy.boss ? 6 : 3 }, () => ({ x: enemy.x, y: enemy.y, vx: (Math.random() - .5) * 150, vy: (Math.random() - .5) * 150, life: .28, max: .28, color: enemy.shield > 0 ? '#d8eaa2' : enemy.color, size: 2 + Math.random() * 2 })));
+    this.particles.push(...Array.from({ length: enemy.boss || enemy.elite ? 6 : 3 }, () => ({ x: enemy.x, y: enemy.y, vx: (Math.random() - .5) * 150, vy: (Math.random() - .5) * 150, life: .28, max: .28, color: enemy.shield > 0 ? '#d8eaa2' : enemy.color, size: 2 + Math.random() * 2 })));
     if (enemy.hp <= 0 && !enemy.dead) this.killEnemy(enemy);
   }
 
@@ -1402,16 +1709,35 @@ class Game {
     this.updateSkillButtons();
   }
 
-  hurtPlayer(amount, slow = 0) {
+  hurtPlayer(amount, slow = 0, burn = 0, burnDamage = 0, debuff = null) {
     const p = this.player;
     if (this.state !== 'playing' || p.invuln > 0) return false;
     const wardMultiplier = p.ward > 0 ? Math.max(.24, .42 - p.wardLevel * .018) : 1;
     const armorMultiplier = 1 - Math.min(.125, p.shellRune * .025);
-    p.hp -= Math.max(1, Math.round(amount * wardMultiplier * armorMultiplier));
+    const sunderMultiplier = p.sunder > 0 ? p.sunderMultiplier : 1;
+    p.hp -= Math.max(1, Math.round(amount * wardMultiplier * armorMultiplier * sunderMultiplier));
     p.invuln = p.hitInvuln;
     p.flash = 1;
     p.hitPulse = 1;
-    p.slow = Math.max(p.slow, slow);
+    if (p.debuffImmune <= 0) {
+      p.slow = Math.max(p.slow, slow);
+      if (burn > 0) {
+        p.burn = Math.max(p.burn, burn);
+        p.burnDamage = Math.max(p.burnDamage, burnDamage || amount * .13);
+        p.burnTimer = p.burnTimer > 0 ? Math.min(p.burnTimer, .2) : .2;
+      }
+      if (debuff) {
+        p.debuff = Math.max(p.debuff, debuff.duration || 0);
+        p.debuffName = debuff.name || '';
+        p.debuffColor = debuff.color || '#fff';
+        p.slow = Math.max(p.slow, debuff.slow || 0);
+        p.root = Math.max(p.root, debuff.root || 0);
+        if (debuff.damageTaken > 1) {
+          p.sunder = Math.max(p.sunder, debuff.duration || 0);
+          p.sunderMultiplier = Math.max(p.sunderMultiplier, debuff.damageTaken);
+        }
+      }
+    }
     this.shake = Math.max(this.shake, 8);
     this.rings.push({ x: p.x, y: p.y, radius: 5, max: 100, life: .48, color: '#ff597a' });
     this.particles.push(...Array.from({ length: 12 }, () => ({ x: p.x + (Math.random() - .5) * 18, y: p.y + (Math.random() - .5) * 18, vx: (Math.random() - .5) * 110, vy: (Math.random() - .5) * 110, life: .3, max: .3, color: '#ff8d97', size: 2.5 + Math.random() * 1.5 })));
@@ -1423,20 +1749,28 @@ class Game {
     this.bossDefeated += 1;
     this.player.skillCapBonus += 2;
     this.player.runeCapBonus += 1;
+    this.player.projectileCapBonus += 1;
+    this.player.orbitCapBonus += 1;
+    this.player.spikeCapBonus += 1;
+    this.player.maxHp += 12;
+    this.player.damage += 4;
     this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.maxHp * .35);
     this.player.dashCooldown = 0;
     this.player.spearCooldown = 0;
     this.player.wardCooldown = 0;
-    this.pickupNotice = { text: `Boss奖励 · 技能上限 +2 · 符文上限 +1`, color: '#ffd06c', life: 2.8 };
+    this.pickupNotice = { text: `Boss奖励 · 技能+2 · 符文+1 · 弹幕/环绕/石矛上限提高`, color: '#ffd06c', life: 2.8 };
   }
 
   enterEndlessMode() {
     this.endless = true;
     this.endlessCycle += 1;
     this.boss = null;
+    this.bosses = [];
     this.bossSpawned = false;
     this.biomeIndex = BIOMES.length - 1;
     this.stageTime = 0;
+    this.eliteTimer = 4;
+    this.eliteSpawned = 0;
     this.loadBiomeSprites(this.biomeIndex);
     void this.preloadStage(this.biomeIndex);
     this.biomeNotice = 3.8;
@@ -1447,6 +1781,7 @@ class Game {
     this.setMusicStage(musicStageFor(this.biomeIndex));
     this.pickupNotice = { text: `无尽模式 · 第 ${this.endlessCycle} 轮开始 · 上限已提升`, color: '#ffd06c', life: 2.8 };
     this.rings.push({ x: this.player.x, y: this.player.y, radius: 10, max: 210, life: .9, color: '#ffd06c' });
+    this.offerEndlessReward();
   }
 
   killEnemy(enemy) {
@@ -1456,12 +1791,20 @@ class Game {
     if (enemy.boss) {
       this.registerBossDefeat();
       this.particles.push(...Array.from({ length: 45 }, () => ({ x: enemy.x, y: enemy.y, vx: (Math.random() - .5) * 360, vy: (Math.random() - .5) * 360, life: .65 + Math.random() * .4, max: 1, color: Math.random() > .5 ? '#ffd37a' : '#ff749a', size: 2 + Math.random() * 4 })));
+      this.bosses = this.bosses.filter(boss => boss !== enemy && !boss.dead);
+      this.boss = this.bosses[0] || null;
+      if (this.bosses.length) {
+        this.setMusicStage(musicStageFor(this.biomeIndex, this.boss));
+        this.pickupNotice = { text: `${enemy.name} 已击败 · 还剩 ${this.bosses.length} 只 Boss`, color: '#ffd06c', life: 2.4 };
+        return;
+      }
       const nextBiome = nextBiomeAfterBoss(enemy.biomeIndex ?? this.biomeIndex);
       if (nextBiome === null) {
         this.enterEndlessMode();
         return;
       }
       this.boss = null;
+      this.bosses = [];
       this.bossSpawned = false;
       this.stageTime = 0;
       this.biomeIndex = nextBiome;
@@ -1476,6 +1819,12 @@ class Game {
       this.setMusicStage(musicStageFor(this.biomeIndex));
       this.rings.push({ x: this.player.x, y: this.player.y, radius: 10, max: 180, life: .75, color: BIOMES[this.biomeIndex].accent });
       return;
+    }
+    if (enemy.elite) {
+      const eliteRune = RUNE_KINDS[this.kills % RUNE_KINDS.length];
+      this.pickups.push({ kind: eliteRune, x: enemy.x + 12, y: enemy.y - 8, r: 11, t: 0 });
+      this.pickupNotice = { text: `${enemy.name} 已击败 · 精英额外掉落符文`, color: BOSS_DEBUFFS[enemy.kind]?.color || '#ffd06c', life: 2.2 };
+      this.particles.push(...Array.from({ length: 28 }, () => ({ x: enemy.x, y: enemy.y, vx: (Math.random() - .5) * 250, vy: (Math.random() - .5) * 250, life: .45 + Math.random() * .25, max: .7, color: BOSS_DEBUFFS[enemy.kind]?.color || '#ffd06c', size: 2 + Math.random() * 3 })));
     }
     const drops = Math.max(1, Math.ceil(enemy.xp / 2));
     for (let i = 0; i < drops; i += 1) this.gems.push({ x: enemy.x + (Math.random() - .5) * 12, y: enemy.y + (Math.random() - .5) * 12, r: 5, value: XP_PER_GEM, t: Math.random() * 3 });
@@ -1493,6 +1842,9 @@ class Game {
     const bossArt = bossShotArt(enemy);
     if (bossArt) this.loadEffectSprite(bossArt.sprite);
     const count = enemy.shots || (enemy.skill === 'fan' ? 3 : 1);
+    const burn = enemy.boss && enemy.shotKind === 'fire' ? (enemy.phaseTwo ? 5.2 : 3.4) : 0;
+    const burnDamage = burn ? enemy.damage * (enemy.phaseTwo ? .18 : .13) : 0;
+    const debuff = bossDebuffFor(enemy);
     const base = Math.atan2(dy, dx);
     const spread = count > 1 ? enemy.shotSpread ?? .28 : 0;
     for (const angle of fanAngles(base, count, spread)) {
@@ -1500,7 +1852,7 @@ class Game {
       if (this.enemyBullets.length >= 36) break;
       this.enemyBullets.push({
         kind: enemy.shotKind, x: enemy.x, y: enemy.y, vx: Math.cos(angle) * enemy.shotSpeed, vy: Math.sin(angle) * enemy.shotSpeed,
-        r: enemy.shotKind === 'fire' ? 7 : 5, damage: enemy.damage * (enemy.shotKind === 'fire' ? .82 : .68), slow: style.slow, life: 2.35,
+        r: enemy.shotKind === 'fire' ? 7 : 5, damage: enemy.damage * (enemy.shotKind === 'fire' ? .82 : .68), slow: style.slow, burn, burnDamage, debuff, life: 2.35,
         bossArt: bossArt?.id || null, bossSprite: bossArt?.sprite || null,
       });
     }
@@ -1514,9 +1866,9 @@ class Game {
   fireRootZone(enemy, dx, dy, distance) {
     if (this.enemyBullets.length >= 36) return;
     const range = Math.min(72, Math.max(40, distance - 24));
-    const bossArt = bossShotArt(enemy);
+    const bossArt = bossZoneArt(enemy);
     if (!bossArt) this.loadEffectSprite('venom');
-    this.enemyBullets.push({ kind: 'root', x: enemy.x + dx / distance * range, y: enemy.y + dy / distance * range, vx: 0, vy: 0, r: 20, damage: enemy.damage * .58, slow: 1.65, life: 2.2, zone: true, bossArt: bossArt?.id || null, bossSprite: bossArt?.sprite || null });
+    this.enemyBullets.push({ kind: 'root', x: enemy.x + dx / distance * range, y: enemy.y + dy / distance * range, vx: 0, vy: 0, r: 20, damage: enemy.damage * .58, slow: 1.65, debuff: bossDebuffFor(enemy), life: 2.2, zone: true, bossArt: bossArt?.id || null, bossSprite: bossArt?.sprite || null });
     this.rings.push({ x: enemy.x + dx / distance * range, y: enemy.y + dy / distance * range, radius: 6, max: 34, life: .35, color: '#a8d86b' });
   }
 
@@ -1531,14 +1883,14 @@ class Game {
         kind: enemy.shotKind, x: enemy.x, y: enemy.y,
         vx: Math.cos(angle) * enemy.shotSpeed * .72, vy: Math.sin(angle) * enemy.shotSpeed * .72,
         r: 6, damage: enemy.damage * .52, slow: ENEMY_SHOT_STYLES[enemy.shotKind]?.slow || 0,
-        life: 2.65, bossArt: bossArt.id, bossSprite: bossArt.sprite,
+        life: 2.65, debuff: bossDebuffFor(enemy), bossArt: bossArt.id, bossSprite: bossArt.sprite,
       });
     }
     this.rings.push({ x: enemy.x, y: enemy.y, radius: enemy.radius, max: enemy.radius * 2.6, life: .5, color: bossArt.color });
   }
 
   fireRootLattice(enemy, dx, dy, distance) {
-    const bossArt = bossShotArt(enemy);
+    const bossArt = bossZoneArt(enemy);
     if (!bossArt) return;
     this.loadEffectSprite(bossArt.sprite);
     const center = Math.atan2(dy, dx);
@@ -1547,13 +1899,13 @@ class Game {
       const angle = center + (index - 1) * .72;
       const x = enemy.x + Math.cos(angle) * range;
       const y = enemy.y + Math.sin(angle) * range;
-      this.enemyBullets.push({ kind: 'root', x, y, vx: 0, vy: 0, r: 24, damage: enemy.damage * .5, slow: 1.8, life: 2.5, zone: true, bossArt: bossArt.id, bossSprite: bossArt.sprite });
+      this.enemyBullets.push({ kind: 'root', x, y, vx: 0, vy: 0, r: 24, damage: enemy.damage * .5, slow: 1.8, debuff: bossDebuffFor(enemy), life: 2.5, zone: true, bossArt: bossArt.id, bossSprite: bossArt.sprite });
       this.rings.push({ x, y, radius: 8, max: 42, life: .45, color: bossArt.color });
     }
   }
 
   fireFlameRain(enemy, dx, dy, distance) {
-    const bossArt = bossShotArt(enemy);
+    const bossArt = bossZoneArt(enemy);
     if (!bossArt) return;
     this.loadEffectSprite(bossArt.sprite);
     const targetX = enemy.x + dx;
@@ -1564,7 +1916,7 @@ class Game {
       const radius = index === 0 ? 0 : 54 + (index % 2) * 18;
       const x = targetX + Math.cos(angle) * radius;
       const y = targetY + Math.sin(angle) * radius;
-      this.enemyBullets.push({ kind: 'fire', x, y, vx: 0, vy: 0, r: 23, damage: enemy.damage * .7, slow: 0, life: 1.9, zone: true, bossArt: bossArt.id, bossSprite: bossArt.sprite });
+      this.enemyBullets.push({ kind: 'fire', x, y, vx: 0, vy: 0, r: 23, damage: enemy.damage * .7, slow: 0, burn: enemy.boss ? (enemy.phaseTwo ? 5.5 : 3.8) : 0, burnDamage: enemy.boss ? enemy.damage * (enemy.phaseTwo ? .2 : .15) : 0, debuff: bossDebuffFor(enemy), life: 1.9, zone: true, bossArt: bossArt.id, bossSprite: bossArt.sprite });
     }
     this.rings.push({ x: targetX, y: targetY, radius: 10, max: 76, life: .42, color: bossArt.color });
   }
@@ -1589,8 +1941,8 @@ class Game {
       this.rings.push({ x: enemy.x, y: enemy.y, radius: enemy.radius, max: 54, life: .24, color: enemy.color });
       return;
     }
-    const bossVariant = enemy.boss ? bossAttackVariant(enemy) : null;
-    if (enemy.boss) enemy.bossPattern = (enemy.bossPattern + 1) % (BOSS_ATTACK_VARIANTS[enemy.kind]?.length || 1);
+    const bossVariant = enemy.boss || enemy.elite ? bossAttackVariant(enemy) : null;
+    if (enemy.boss || enemy.elite) enemy.bossPattern = (enemy.bossPattern + 1) % (BOSS_ATTACK_VARIANTS[enemy.kind]?.length || 1);
     if (enemy.skill === 'tide') {
       if (bossVariant === 'tideRing') this.fireTideRing(enemy);
       else this.fireEnemyShots(enemy, dx, dy);
@@ -1606,6 +1958,52 @@ class Game {
       enemy.skillTimer = enemy.skillEvery;
       return;
     }
+    if (enemy.skill === 'dragon') {
+      if (bossVariant === 'dragonRain') this.fireFlameRain(enemy, dx, dy, distance);
+      else this.fireEnemyShots(enemy, dx, dy);
+      enemy.skillTimer = enemy.skillEvery;
+      return;
+    }
+    if (enemy.skill === 'titan') {
+      if (bossVariant === 'titanStomp') {
+        const radius = enemy.skillRadius;
+        enemy.skillTimer = enemy.skillEvery;
+        this.loadEffectSprite('fireRing');
+        this.rings.push({ x: enemy.x, y: enemy.y, radius: 7, max: radius, life: .55, color: enemy.color, sprite: 'fireRing' });
+        if (distance < radius) this.hurtPlayer(enemy.damage * enemy.skillPower, 0, enemy.phaseTwo ? 4.8 : 3.2, enemy.damage * (enemy.phaseTwo ? .2 : .15), bossDebuffFor(enemy));
+      } else {
+        this.fireEnemyShots(enemy, dx, dy);
+        enemy.skillTimer = enemy.skillEvery;
+      }
+      this.shake = Math.max(this.shake, 6);
+      return;
+    }
+    if (enemy.skill === 'charge') {
+      if (bossVariant === 'hornCharge') {
+        enemy.dash = .72;
+        enemy.windup = .3;
+        enemy.dashAngle = Math.atan2(dy, dx);
+        this.rings.push({ x: enemy.x, y: enemy.y, radius: enemy.radius, max: 70, life: .28, color: enemy.color });
+      } else this.fireEnemyShots(enemy, dx, dy);
+      enemy.skillTimer = enemy.skillEvery;
+      return;
+    }
+    if (enemy.skill === 'serpent') {
+      if (bossVariant === 'serpentLattice') this.fireRootLattice(enemy, dx, dy, distance);
+      else this.fireEnemyShots(enemy, dx, dy);
+      enemy.skillTimer = enemy.skillEvery;
+      return;
+    }
+    if (enemy.skill === 'imp') {
+      if (bossVariant === 'impBlink') {
+        enemy.dash = .4;
+        enemy.windup = .16;
+        enemy.dashAngle = Math.atan2(dy, dx);
+        this.fireFlameRain(enemy, dx, dy, distance);
+      } else this.fireEnemyShots(enemy, dx, dy);
+      enemy.skillTimer = enemy.skillEvery;
+      return;
+    }
     if (enemy.skill === 'root') {
       this.fireRootZone(enemy, dx, dy, distance);
       enemy.skillTimer = enemy.skillEvery;
@@ -1615,7 +2013,7 @@ class Game {
       const radius = enemy.skillRadius || enemy.radius * 4;
       enemy.skillTimer = enemy.skillEvery;
       this.rings.push({ x: enemy.x, y: enemy.y, radius: 7, max: radius, life: .45, color: enemy.color });
-      if (distance < radius) this.hurtPlayer(enemy.damage * (enemy.skillPower || 1));
+       if (distance < radius) this.hurtPlayer(enemy.damage * (enemy.skillPower || 1), 0, enemy.boss && enemy.shotKind === 'fire' ? (enemy.phaseTwo ? 4.6 : 3) : 0, enemy.boss && enemy.shotKind === 'fire' ? enemy.damage * (enemy.phaseTwo ? .18 : .13) : 0, bossDebuffFor(enemy));
       if (enemy.boss && bossVariant === 'flameRain') this.fireFlameRain(enemy, dx, dy, distance);
       else if (enemy.boss) this.fireEnemyShots(enemy, dx, dy);
       if (enemy.boss) this.shake = Math.max(this.shake, 6);
@@ -1634,7 +2032,7 @@ class Game {
       bullet.y += bullet.vy * dt;
       let removed = bullet.life <= 0 || (!bullet.zone && hitsObstacle(bullet.x, bullet.y, bullet.r));
       if (!removed && Math.hypot(p.x - bullet.x, p.y - bullet.y) < p.r + bullet.r) {
-        this.hurtPlayer(bullet.damage, bullet.slow);
+        this.hurtPlayer(bullet.damage, bullet.slow, bullet.burn, bullet.burnDamage, bullet.debuff);
         if (this.state !== 'playing') return;
         this.rings.push({ x: bullet.x, y: bullet.y, radius: 4, max: 34, life: .22, color: ENEMY_SHOT_STYLES[bullet.kind].color });
         removed = !bullet.zone;
@@ -1678,11 +2076,12 @@ class Game {
       const moveY = dashing ? Math.sin(e.dashAngle) * speed * dt : dy / distance * speed * dt + dx / distance * lateral * dt;
       e.facing = directionFrame(dx, dy);
       e.flipX = mirrorFacing(e.facing);
-      this.moveAgainstTerrain(e, moveX, moveY, e.radius, e.canFly);
+      // ponytail: sidestep locally; no pathfinding graph needed for this open arena.
+      this.moveAgainstTerrain(e, moveX, moveY, e.radius);
       if (distance < p.r + e.radius && e.attack <= 0) {
-        this.hurtPlayer(e.damage);
+         this.hurtPlayer(e.damage, 0, 0, 0, bossDebuffFor(e));
         if (this.state !== 'playing') return;
-        e.attack = .75;
+         e.attack = e.attackEvery;
       }
     }
   }
@@ -1749,11 +2148,9 @@ class Game {
     }
   }
 
-  levelUp() {
-    if (this.state !== 'playing') return;
-    healOnLevel(this.player);
+  showChoices(options, title = '选择一项强化') {
     this.state = 'upgrade';
-    const options = chooseUnique(UPGRADES.filter(option => !option.requires || option.requires(this.player)), 3);
+    this.dom.upgrade.querySelector('h2').textContent = title;
     this.dom.choices.replaceChildren(...options.map(option => {
       const button = document.createElement('button');
       button.className = 'choice';
@@ -1762,10 +2159,21 @@ class Game {
         option.apply(this.player);
         this.dom.upgrade.hidden = true;
         this.state = 'playing';
+        this.updateSkillButtons();
       }, { once: true });
       return button;
     }));
     this.dom.upgrade.hidden = false;
+  }
+
+  levelUp() {
+    if (this.state !== 'playing') return;
+    healOnLevel(this.player);
+    this.showChoices(chooseUnique(UPGRADES.filter(option => !option.requires || option.requires(this.player)), 3));
+  }
+
+  offerEndlessReward() {
+    this.showChoices(chooseUnique(ENDLESS_REWARDS, 3), '选择一项轮回祝福');
   }
 
   nova() {
@@ -1773,15 +2181,27 @@ class Game {
     const p = this.player;
     const form = growthForm(p.growthStage);
     p.nova = p.novaMax;
-    this.rings.push({ x: p.x, y: p.y, radius: 7, max: Math.max(this.width, this.height) * .68, life: .65, color: form.color, stage: p.growthStage });
+    p.debuffImmune = .8 + p.novaLevel * .16;
+    p.slow = 0;
+    p.root = 0;
+    p.burn = 0;
+    p.burnTimer = 0;
+    p.burnDamage = 0;
+    p.debuff = 0;
+    p.debuffName = '';
+    p.sunder = 0;
+    p.sunderMultiplier = 1;
+    const radius = 240 + p.growthStage * 18 + p.novaLevel * 18;
+    const damage = 36 + this.player.damage * .6 + p.growthStage * 8 + p.novaLevel * 8;
+    this.rings.push({ x: p.x, y: p.y, radius: 7, max: Math.max(this.width, this.height) * .68 + p.novaLevel * 14, life: .65, color: form.color, stage: p.growthStage });
     this.shake = 7;
     for (const enemy of this.enemies) {
       const distance = Math.hypot(enemy.x - p.x, enemy.y - p.y);
-      if (distance < 240 + p.growthStage * 18) this.damageEnemy(enemy, 36 + this.player.damage * .6 + p.growthStage * 8);
+      if (distance < radius) this.damageEnemy(enemy, damage);
     }
     for (const building of this.buildings) {
       const distance = Math.hypot(building.x - p.x, building.y - p.y);
-      if (distance < 240 + p.growthStage * 18) this.damageBuilding(building, 36 + this.player.damage * .6 + p.growthStage * 8);
+      if (distance < radius) this.damageBuilding(building, damage);
     }
     this.particles.push(...Array.from({ length: 32 }, () => ({ x: p.x, y: p.y, vx: (Math.random() - .5) * 430, vy: (Math.random() - .5) * 430, life: .4 + Math.random() * .3, max: .7, color: form.color, size: 2 + Math.random() * 3 })));
   }
@@ -1866,7 +2286,9 @@ class Game {
   updateNovaButton() {
     const ready = this.player.nova <= 0;
     this.dom.nova.dataset.ready = String(ready);
-    this.dom.nova.innerHTML = ready ? '脉冲<small>就绪</small>' : `脉冲<small>${this.player.nova.toFixed(1)}s</small>`;
+    const name = this.player.novaLevel ? `脉冲+${this.player.novaLevel}` : '脉冲';
+    const status = this.player.debuffImmune > 0 ? `免疫 ${this.player.debuffImmune.toFixed(1)}s` : ready ? '就绪' : `${this.player.nova.toFixed(1)}s`;
+    this.dom.nova.innerHTML = `${name}<small>${status}</small>`;
   }
 
   updateSkillButtons() {
@@ -2018,16 +2440,18 @@ class Game {
         if (!obstacle) continue;
         ctx.save();
         ctx.translate(obstacle.x, obstacle.y);
+        const art = obstacleVariantFor(obstacle, biome.terrain);
+        const visualScale = art?.scale || 1;
         ctx.fillStyle = 'rgba(15, 23, 18, .25)';
-        ctx.beginPath(); ctx.ellipse(0, obstacle.r * .72, obstacle.r * 1.18, obstacle.r * .42, 0, 0, TAU); ctx.fill();
-        const art = OBSTACLE_ART[biome.terrain];
-        const sprite = this.obstacleSprites[biome.terrain];
+        ctx.beginPath(); ctx.ellipse(0, obstacle.r * .72 * visualScale, obstacle.r * 1.18 * visualScale, obstacle.r * .42 * visualScale, 0, 0, TAU); ctx.fill();
+        const variantIndex = obstacleVariantIndex(obstacle, biome.terrain);
+        const sprite = this.loadObstacleSprite(biome.terrain, variantIndex);
         if (sprite?.ready) {
-          const height = obstacle.r * art.height;
+          const height = obstacle.r * art.height * visualScale;
           const width = height * sprite.image.width / sprite.image.height;
           ctx.globalAlpha = .94;
           ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(sprite.image, -width / 2, obstacle.r * art.floor - height, width, height);
+          ctx.drawImage(sprite.image, -width / 2, obstacle.r * art.floor * visualScale - height, width, height);
           ctx.imageSmoothingEnabled = true;
           ctx.restore();
           continue;
@@ -2176,7 +2600,7 @@ class Game {
       const form = growthForm(b.stage || 0);
       if (b.kind === 'hurricane') {
         const art = EFFECT_ART.hurricane;
-        const sprite = this.effectSprites.hurricane;
+        const sprite = this.effectSprites.hurricane || this.loadEffectSprite('hurricane');
         const size = art.size + b.r * 1.4;
         ctx.save();
         ctx.translate(b.x, b.y);
@@ -2252,6 +2676,32 @@ class Game {
       ctx.save();
       ctx.translate(bullet.x, bullet.y);
       const angle = Math.atan2(bullet.vy, bullet.vx);
+      if (bullet.bossArt === 'fireSpikes' || bullet.bossArt === 'fireball' || bullet.bossArt === 'fireWave') {
+        const art = EFFECT_ART[bullet.bossArt];
+        const sprite = this.effectSprites[bullet.bossSprite];
+        const width = bullet.zone ? Math.max(art.width || art.size, bullet.r * 4.8) : Math.max(art.size, bullet.r * 3.5);
+        const height = bullet.zone ? art.height : width;
+        ctx.rotate(bullet.bossArt === 'fireSpikes' ? angle + Math.PI / 2 : angle);
+        if (sprite?.ready) {
+          ctx.globalAlpha = bullet.zone ? .88 : 1;
+          ctx.shadowColor = art.glow || style.glow; ctx.shadowBlur = 14;
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(sprite.image, -width / 2, -height / 2, width, height);
+          ctx.imageSmoothingEnabled = true;
+          ctx.restore();
+          continue;
+        }
+        ctx.fillStyle = style.color; ctx.shadowColor = style.glow; ctx.shadowBlur = 11;
+        if (bullet.bossArt === 'fireWave') {
+          ctx.beginPath(); ctx.moveTo(-width / 2, height / 2); ctx.quadraticCurveTo(0, -height, width / 2, height / 2); ctx.closePath(); ctx.fill();
+        } else if (bullet.bossArt === 'fireSpikes') {
+          ctx.beginPath(); ctx.moveTo(width / 2, 0); ctx.lineTo(-width / 2, -height / 2); ctx.lineTo(-width * .22, 0); ctx.lineTo(-width / 2, height / 2); ctx.closePath(); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(0, 0, width * .38, 0, TAU); ctx.fill();
+        }
+        ctx.restore();
+        continue;
+      }
       if (bullet.bossArt === 'bubble') {
         const sprite = this.effectSprites[bullet.bossSprite];
         if (sprite?.ready) {
@@ -2348,8 +2798,17 @@ class Game {
     for (const e of this.enemies) {
       ctx.save();
       ctx.translate(e.x, e.y);
-      const scale = e.boss ? 1 + Math.sin(this.time * 3) * .05 : 1;
+      const scale = e.boss || e.elite ? 1 + Math.sin(this.time * 3) * .05 : 1;
       ctx.scale(scale, scale);
+      if ((e.boss || e.elite) && e.endlessAffix) {
+        ctx.globalAlpha = .48 + Math.sin(this.time * 5 + e.phase) * .12;
+        ctx.strokeStyle = e.endlessAffix.color;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = e.endlessAffix.color;
+        ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(0, 0, e.radius * 1.32, 0, TAU); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
       const sprite = this.enemySprites[e.sprite];
       if (sprite?.ready) {
         const frame = sprite.frames?.[e.facing];
@@ -2361,17 +2820,46 @@ class Game {
         ctx.drawImage(sprite.image, x, y, width, height, -width * artScale / 2, -height * artScale / 2, width * artScale, height * artScale);
         ctx.imageSmoothingEnabled = true;
         ctx.restore();
-        if (e.boss || e.hp < e.maxHp) this.drawBar(ctx, e.x - e.radius, e.y - e.radius - 11, e.radius * 2, 4, e.hp / e.maxHp, e.boss ? '#ff7499' : '#efb0ff');
+        if (e.boss || e.elite || e.hp < e.maxHp) this.drawBar(ctx, e.x - e.radius, e.y - e.radius - 11, e.radius * 2, 4, e.hp / e.maxHp, e.boss ? '#ff7499' : e.elite ? '#ffd06c' : '#efb0ff');
         continue;
       }
-      ctx.shadowColor = e.color; ctx.shadowBlur = e.boss ? 24 : 14;
+      ctx.shadowColor = e.color; ctx.shadowBlur = e.boss || e.elite ? 24 : 14;
       ctx.fillStyle = e.hit > 0 ? '#fff5f8' : e.color;
+      if (e.form === 'dragon' || e.form === 'titan' || e.form === 'horned' || e.form === 'serpent' || e.form === 'imp') {
+        const r = e.radius;
+        if (e.form === 'dragon') {
+          ctx.beginPath(); ctx.ellipse(0, 0, r * 1.05, r * .72, 0, 0, TAU); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(-r * .45, -r * .2); ctx.lineTo(-r * 1.65, -r * 1.05); ctx.lineTo(-r * 1.08, r * .28); ctx.closePath(); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(r * .45, -r * .2); ctx.lineTo(r * 1.65, -r * 1.05); ctx.lineTo(r * 1.08, r * .28); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(r * .28, -r * .1, r * .16, 0, TAU); ctx.fill();
+        } else if (e.form === 'titan') {
+          ctx.fillRect(-r * .82, -r * .95, r * 1.64, r * 1.9);
+          ctx.fillRect(-r * 1.3, -r * .6, r * .55, r * .95); ctx.fillRect(r * .75, -r * .6, r * .55, r * .95);
+          ctx.fillStyle = '#ffce70'; ctx.fillRect(-r * .34, -r * .35, r * .18, r * .18); ctx.fillRect(r * .16, -r * .35, r * .18, r * .18);
+        } else if (e.form === 'horned') {
+          ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(-r * .35, -r * .58); ctx.lineTo(-r * 1.12, -r * 1.35); ctx.lineTo(-r * .75, -r * .15); ctx.closePath(); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(r * .35, -r * .58); ctx.lineTo(r * 1.12, -r * 1.35); ctx.lineTo(r * .75, -r * .15); ctx.closePath(); ctx.fill();
+        } else if (e.form === 'serpent') {
+          ctx.beginPath(); ctx.ellipse(0, 0, r * 1.32, r * .7, Math.sin(this.time * 2) * .35, 0, TAU); ctx.fill();
+          ctx.beginPath(); ctx.arc(r * .78, -r * .06, r * .48, 0, TAU); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(0, 0, r * .78, 0, TAU); ctx.fill();
+          for (let spike = 0; spike < 5; spike += 1) {
+            const angle = spike / 5 * TAU - Math.PI / 2;
+            ctx.beginPath(); ctx.moveTo(Math.cos(angle) * r * .62, Math.sin(angle) * r * .62); ctx.lineTo(Math.cos(angle) * r * 1.35, Math.sin(angle) * r * 1.35); ctx.lineTo(Math.cos(angle + .28) * r * .66, Math.sin(angle + .28) * r * .66); ctx.closePath(); ctx.fill();
+          }
+        }
+        ctx.restore();
+        this.drawBar(ctx, e.x - e.radius, e.y - e.radius - 11, e.radius * 2, 4, e.hp / e.maxHp, e.boss ? '#ff7499' : '#ffd06c');
+        continue;
+      }
       const sides = e.form === 'spore' ? 10 : e.form === 'wing' ? 4 : e.form === 'shell' ? 6 : e.form === 'mutant' ? 7 : 8;
       ctx.beginPath();
       for (let i = 0; i < sides; i += 1) {
         const pointy = e.form === 'spore' || e.form === 'wing';
         const radius = e.radius * (pointy && i % 2 ? .48 : e.form === 'shell' && i % 2 ? .82 : 1);
-        const angle = i / sides * TAU + this.time * (e.boss ? .55 : e.form === 'wing' ? 1.8 : -.7);
+        const angle = i / sides * TAU + this.time * (e.boss || e.elite ? .55 : e.form === 'wing' ? 1.8 : -.7);
         i ? ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius) : ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
       }
       ctx.closePath(); ctx.fill();
@@ -2380,7 +2868,7 @@ class Game {
       ctx.beginPath(); ctx.arc(-e.radius * .24, -e.radius * .12, Math.max(2, e.radius * .13), 0, TAU); ctx.fill();
       ctx.beginPath(); ctx.arc(e.radius * .24, -e.radius * .12, Math.max(2, e.radius * .13), 0, TAU); ctx.fill();
       ctx.restore();
-      if (e.boss || e.hp < e.maxHp) this.drawBar(ctx, e.x - e.radius, e.y - e.radius - 11, e.radius * 2, 4, e.hp / e.maxHp, e.boss ? '#ff7499' : '#efb0ff');
+      if (e.boss || e.elite || e.hp < e.maxHp) this.drawBar(ctx, e.x - e.radius, e.y - e.radius - 11, e.radius * 2, 4, e.hp / e.maxHp, e.boss ? '#ff7499' : e.elite ? '#ffd06c' : '#efb0ff');
     }
   }
 
@@ -2428,16 +2916,17 @@ class Game {
     const p = this.player;
     if (!p.orbitCount) return;
     const form = growthForm(p.growthStage);
+    const sprite = this.effectSprites.fan || this.loadEffectSprite('fan');
     for (let index = 0; index < p.orbitCount; index += 1) {
       const point = this.orbitPoint(index);
       ctx.save();
       ctx.translate(point.x, point.y);
-      if (this.effectSprites.fan?.ready) {
+      if (sprite?.ready) {
         const size = EFFECT_ART.fan.size;
         ctx.rotate(orbitFanAngle(point.angle));
         ctx.shadowColor = '#d4e9ff'; ctx.shadowBlur = 12;
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(this.effectSprites.fan.image, -size / 2, -size / 2, size, size);
+        ctx.drawImage(sprite.image, -size / 2, -size / 2, size, size);
         ctx.imageSmoothingEnabled = true;
       } else {
         ctx.rotate(point.angle);
@@ -2470,6 +2959,20 @@ class Game {
       ctx.strokeStyle = ring.color; ctx.lineWidth = 3;
       ctx.shadowColor = ring.color; ctx.shadowBlur = 14;
       ctx.beginPath(); ctx.arc(ring.x, ring.y, ring.radius, 0, TAU); ctx.stroke();
+      if (ring.sprite) {
+        const sprite = this.effectSprites[ring.sprite];
+        const art = EFFECT_ART[ring.sprite];
+        if (sprite?.ready) {
+          const size = Math.max(art?.size || 0, ring.radius * 2.05);
+          ctx.globalAlpha = clamp(ring.life * 1.35, 0, .75);
+          ctx.translate(ring.x, ring.y);
+          ctx.rotate(this.time * 1.4);
+          ctx.shadowColor = ring.color; ctx.shadowBlur = 18;
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(sprite.image, -size / 2, -size / 2, size, size);
+          ctx.imageSmoothingEnabled = true;
+        }
+      }
       ctx.restore();
     }
     for (const p of this.particles) {
@@ -2507,6 +3010,13 @@ class Game {
       p.invuln > 1 && `护符 ${Math.ceil(p.invuln)}s`,
       p.ward > 0 && `护壁 ${Math.ceil(p.ward)}s`,
     ].filter(Boolean).join(' · ');
+    const conditions = [
+      p.burn > 0 && `灼烧 ${Math.ceil(p.burn)}s`,
+      p.slow > 0 && `迟滞 ${Math.ceil(p.slow)}s`,
+      p.root > 0 && `禁锢 ${Math.ceil(p.root)}s`,
+      p.debuff > 0 && `${p.debuffName} ${Math.ceil(p.debuff)}s`,
+      p.debuffImmune > 0 && `脉冲免疫 ${Math.ceil(p.debuffImmune)}s`,
+    ].filter(Boolean).join(' · ');
     const runes = [
       p.vampireLevel > 0 && `血 ${p.vampireLevel}`,
       p.rageRune > 0 && `战 ${p.rageRune}`,
@@ -2514,7 +3024,7 @@ class Game {
       p.windRune > 0 && `风 ${p.windRune}`,
       p.echoRune > 0 && `响 ${p.echoRune}`,
     ].filter(Boolean).join(' · ');
-    const statusLines = [buffs, runes].filter(Boolean);
+    const statusLines = [buffs, conditions, runes].filter(Boolean);
     ctx.save();
     ctx.fillStyle = 'rgba(9, 24, 20, .64)';
     ctx.fillRect(12, 12, Math.min(258, this.width - 24), 62 + statusLines.length * 14);
@@ -2540,9 +3050,10 @@ class Game {
       ctx.font = '700 10px system-ui';
       ctx.fillText(line, 20, 76 + index * 13);
     });
-    const activeBoss = bossBarVisible(this.boss);
+    const activeBosses = this.activeBosses();
+    const activeBoss = activeBosses[0];
     const objective = activeBoss
-      ? this.boss.name
+      ? activeBosses.length > 1 ? `Boss 战 · ${activeBosses.length} 只` : activeBoss.name
       : this.endless
         ? `无尽轮回 ${this.endlessCycle} · ${Math.max(0, Math.ceil(BOSS_TIME - this.stageTime))}s`
         : `火种迁徙 ${Math.max(0, Math.ceil(BOSS_TIME - this.stageTime))}s`;
@@ -2559,53 +3070,57 @@ class Game {
   }
 
   drawBossBar(ctx) {
-    const boss = this.boss;
-    if (!bossBarVisible(boss)) return;
-    const { x, y, width } = bossBarLayout(this.width, this.height);
-    const ratio = clamp(boss.hp / boss.maxHp, 0, 1);
-    ctx.save();
-    ctx.fillStyle = 'rgba(28, 12, 20, .8)';
-    ctx.fillRect(x - 10, y - 24, width + 20, 43);
-    ctx.strokeStyle = boss.phaseTwo ? '#ffd06f' : '#ff8d9d';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(x - 10, y - 24, width + 20, 43);
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#fff0d9';
-    ctx.font = '800 13px system-ui';
-    ctx.fillText(`BOSS · ${boss.name}${boss.phaseTwo ? ' · 狂怒' : ''}`, this.width / 2, y - 8);
-    this.drawBar(ctx, x, y, width, 10, ratio, boss.phaseTwo ? '#ffbe5d' : '#ef657a');
-    ctx.fillStyle = '#ffd9d2';
-    ctx.font = '700 10px system-ui';
-    ctx.fillText(`${Math.max(0, Math.ceil(boss.hp))} / ${boss.maxHp}`, this.width / 2, y + 29);
-    ctx.restore();
+    const bosses = this.activeBosses();
+    bosses.forEach((boss, index) => {
+      const { x, y, width } = bossBarLayout(this.width, this.height, index, bosses.length);
+      const ratio = clamp(boss.hp / boss.maxHp, 0, 1);
+      ctx.save();
+      ctx.fillStyle = 'rgba(28, 12, 20, .8)';
+      ctx.fillRect(x - 10, y - 24, width + 20, 43);
+      ctx.strokeStyle = boss.phaseTwo ? '#ffd06f' : '#ff8d9d';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x - 10, y - 24, width + 20, 43);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#fff0d9';
+      ctx.font = '800 13px system-ui';
+       ctx.fillText(`BOSS${boss.endlessAffix ? ` · ${boss.endlessAffix.name}` : ''} · ${boss.name}${boss.phaseTwo ? ' · 狂怒' : ''}`, this.width / 2, y - 8);
+      this.drawBar(ctx, x, y, width, 10, ratio, boss.phaseTwo ? '#ffbe5d' : '#ef657a');
+      ctx.fillStyle = '#ffd9d2';
+      ctx.font = '700 10px system-ui';
+      ctx.fillText(`${Math.max(0, Math.ceil(boss.hp))} / ${boss.maxHp}`, this.width / 2, y + 29);
+      ctx.restore();
+    });
   }
 
   drawBossArrow(ctx) {
-    const point = bossArrowLayout(this.width, this.height, this.boss, this.camera);
-    if (!point) return;
-    const pulse = .8 + Math.sin(this.time * 5.5) * .12;
-    ctx.save();
-    ctx.translate(point.x, point.y);
-    ctx.rotate(point.angle + Math.PI / 2);
-    ctx.globalAlpha = pulse;
-    ctx.fillStyle = '#ffd06c';
-    ctx.shadowColor = '#ff7d65';
-    ctx.shadowBlur = 14;
-    ctx.beginPath();
-    ctx.moveTo(0, -13);
-    ctx.lineTo(9, 8);
-    ctx.lineTo(0, 4);
-    ctx.lineTo(-9, 8);
-    ctx.closePath();
-    ctx.fill();
-    if (point.offscreen) {
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = '#fff0d0';
-      ctx.font = '800 9px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText('BOSS', 0, 21);
-    }
-    ctx.restore();
+    const bosses = this.activeBosses();
+    bosses.forEach(boss => {
+      const point = bossArrowLayout(this.width, this.height, boss, this.camera);
+      if (!point) return;
+      const pulse = .8 + Math.sin(this.time * 5.5) * .12;
+      ctx.save();
+      ctx.translate(point.x, point.y);
+      ctx.rotate(point.angle + Math.PI / 2);
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = '#ffd06c';
+      ctx.shadowColor = '#ff7d65';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(0, -13);
+      ctx.lineTo(9, 8);
+      ctx.lineTo(0, 4);
+      ctx.lineTo(-9, 8);
+      ctx.closePath();
+      ctx.fill();
+      if (point.offscreen) {
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#fff0d0';
+        ctx.font = '800 9px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('BOSS', 0, 21);
+      }
+      ctx.restore();
+    });
   }
 
   drawPickupNotice(ctx) {
@@ -2637,12 +3152,14 @@ class Game {
     ctx.fillText(this.endless ? `无尽轮回 · 第 ${this.endlessCycle} 轮` : `生态阶段 ${this.biomeIndex + 1} · ${biome.name}`, this.width / 2, this.height * .39 + 28);
     ctx.fillStyle = '#e8f1dc';
     ctx.font = '500 12px system-ui';
-    ctx.fillText(this.endless ? '赤焰巨猿将再次降临，敌人持续强化' : biome.subtitle, this.width / 2, this.height * .39 + 49);
+    ctx.fillText(this.endless ? `本轮 ${endlessBossCount(this.endlessCycle)} 只 Boss · 精英持续刷新 · 间隔 ${endlessEliteSpawnInterval(this.endlessCycle).toFixed(1)}s${this.endlessCycle >= 2 ? ' · 词缀轮换' : ''}` : biome.subtitle, this.width / 2, this.height * .39 + 49);
     ctx.restore();
   }
 }
 
 function boot() {
+  const mobileDevice = window.matchMedia?.('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod|Mobile/i.test(globalThis.navigator?.userAgent || '');
+  document.body.classList.toggle('mobile-device', mobileDevice);
   const dom = {
     start: document.querySelector('#start-screen'),
     upgrade: document.querySelector('#upgrade-screen'),
@@ -2676,7 +3193,7 @@ function boot() {
 }
 
 if (typeof document === 'undefined') {
-globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, runeMaxFor, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, BOSS_ATTACK_VARIANTS, bossAttackVariant, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, growPlayerStatsOnLevel, endlessMultiplier, tuneBossStats, hitFeedbackAlpha, relicSpawnMinDistance, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, skillMaxLevel, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, spawnInterval, bossSpawnInterval, endlessSpawnCount, nextExperienceTarget, growthForm, stageClock, nextBiomeAfterBoss, wrapCanvasText };
+  globalThis.__civilizationTest = { clamp, joystickVector, chooseUnique, assetSourceCandidates, loadImageWithFallback, enemyStats, enemyScore, XP_PER_GEM, VAMPIRE_HEAL_PER_HIT, VAMPIRE_RUNE_CHANCE, RUNE_CONFIG, RUNE_KINDS, rollRune, runeMaxFor, LEADERBOARD_LIMIT, normalizePlayerName, readLeaderboard, saveLeaderboardEntry, BIOME_DURATION, BOSS_TIME, BIOMES, OBSTACLE_ART, obstacleVariants, obstacleVariantIndex, obstacleVariantFor, RELIC_ART, ENEMY_ART, ENEMY_SPRITE_FRAMES, EFFECT_ART, BOSS_SHOT_ART, BOSS_DEBUFFS, BOSS_ATTACK_VARIANTS, ENDLESS_BOSSES, ENDLESS_LEGACY_BOSSES, ENDLESS_ELITE_ACTIVE_CAP, ENDLESS_BOSS_AFFIXES, bossAttackVariant, bossDebuffFor, endlessBossAffixFor, endlessBossKinds, endlessBossCount, endlessEliteSpawnInterval, HURRICANE_SPEED, HURRICANE_KNOCKBACK, hurricaneKnockback, healOnLevel, growPlayerStatsOnLevel, endlessMultiplier, tuneBossStats, hitFeedbackAlpha, relicSpawnMinDistance, FAN_HANDLE_ANGLE, ACTIVE_SKILLS, ACTIVE_SKILL_MAX_LEVEL, skillMaxLevel, projectileMax, orbitMax, spikeMax, RELIC_BUILDING_SITES, RELIC_RESPAWN_INTERVAL, RELIC_MAX_ACTIVE, MUSIC_LOOP_SECONDS, MUSIC_GAIN, MUSIC_STAGES, UPGRADES, ENDLESS_REWARDS, PICKUPS, makeRelicBuilding, makeRelicBuildings, activeSkillCooldown, createMusicLoop, enemyVisualScale, getBiomeIndex, cameraFromPlayer, directionFrame, mirrorFacing, orbitFanAngle, pickupIndex, tileRange, obstacleAt, hitsObstacle, facingAngle, fanAngles, applyPickup, applyVampireHeal, difficultyFor, musicFrequency, musicStageFor, bossBarVisible, bossBarLayout, bossArrowLayout, bossShotArt, bossZoneArt, spawnInterval, bossSpawnInterval, endlessSpawnCount, nextExperienceTarget, growthForm, stageClock, nextBiomeAfterBoss, wrapCanvasText };
 } else {
   boot();
 }
